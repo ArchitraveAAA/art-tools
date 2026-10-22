@@ -1,0 +1,1312 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>参考資料ボード</title>
+<style>
+:root{
+  --bg:#1c1c1c;--panel:#242424;--panel2:#2d2d2d;--line:#3a3a3a;--text:#e4e4e4;--sub:#9a9a9a;
+  --accent:#4a8fd6;--accent-t:#fff;--ex:#c85a54;--tile:#2a2a2a;--ai:#8f8f8f;--star:#e8b923;
+  color-scheme:dark;
+}
+:root[data-theme=light]{
+  --bg:#e6e6e6;--panel:#f2f2f2;--panel2:#fff;--line:#cfcfcf;--text:#1c1c1c;--sub:#666;
+  --tile:#d6d6d6;--ai:#777;color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:13px/1.5 "Yu Gothic UI","Meiryo","Hiragino Sans","Noto Sans JP",system-ui,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+button:hover{border-color:var(--sub)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-t)}
+button:disabled{opacity:.45;cursor:default}
+input[type=text],input[type=search],select{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 8px;min-width:0}
+input[type=range]{accent-color:var(--accent)}
+.hidden{display:none!important}
+
+#app{display:grid;grid-template-rows:auto 1fr;grid-template-columns:270px 1fr;height:100vh}
+#app.nosb{grid-template-columns:0 1fr}
+#app.nosb #side{display:none}
+#side{grid-column:1;grid-row:2}#main{grid-column:2;grid-row:2}
+header{grid-column:1/3;display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header .grow{flex:1}
+#q{width:260px}
+#aiStatus{color:var(--sub);font-size:12px;white-space:nowrap}
+#side{overflow:auto;background:var(--panel);border-right:1px solid var(--line);padding:10px 10px 80px}
+#main{position:relative;overflow:auto}
+#grid{position:relative;margin:12px}
+#banner{position:sticky;top:0;z-index:5;background:var(--panel);border-bottom:1px solid var(--line);padding:6px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#banner:empty{display:none}
+
+.sec{margin-bottom:12px}
+.sec h3{margin:0 0 6px;font-size:12px;color:var(--sub);font-weight:600;display:flex;align-items:center;gap:6px;cursor:pointer;user-select:none}
+.sec h3 .n{margin-left:auto;font-weight:400}
+.sec.collapsed .chips{display:none}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:12px;background:var(--panel2);border:1px solid var(--line);cursor:pointer;user-select:none;font-size:12px}
+.chip .c{color:var(--sub);font-size:11px}
+.chip.on{background:var(--accent);border-color:var(--accent);color:var(--accent-t)}
+.chip.on .c{color:var(--accent-t);opacity:.8}
+.chip.ex{background:var(--ex);border-color:var(--ex);color:#fff;text-decoration:line-through}
+.chip.zero{opacity:.35}
+.chip.ai{border-style:dashed}
+.chip .x{opacity:.6;margin-left:2px}
+.chip .x:hover{opacity:1}
+.hint{color:var(--sub);font-size:11px;line-height:1.5}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+
+.tile{position:absolute;border-radius:6px;overflow:hidden;background:var(--tile);cursor:zoom-in}
+.tile img{width:100%;height:100%;display:block;object-fit:cover;opacity:0;transition:opacity .15s}
+.tile img.ld{opacity:1}
+.tile .ov{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .1s;background:linear-gradient(transparent 60%,rgba(0,0,0,.55))}
+.tile:hover .ov{opacity:1}
+.tile .nm{position:absolute;left:6px;right:30px;bottom:4px;color:#fff;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .st{position:absolute;right:4px;top:4px;pointer-events:auto;background:rgba(0,0,0,.45);border:none;color:#fff;border-radius:50%;width:26px;height:26px;padding:0;font-size:15px;line-height:26px;opacity:0}
+.tile:hover .st,.tile .st.on{opacity:1}
+.tile .st.on{color:var(--star)}
+.tile.sel{outline:3px solid var(--accent);outline-offset:-3px}
+.tile.sel::after{content:"✓";position:absolute;left:6px;top:4px;background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:13px}
+
+#selbar{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:20;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;display:flex;gap:8px;align-items:center;box-shadow:0 6px 24px rgba(0,0,0,.35);flex-wrap:wrap;max-width:calc(100vw - 32px)}
+
+#start{position:fixed;inset:0;z-index:30;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px}
+#start .box{max-width:520px;width:100%;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:24px}
+#start h1{margin:0 0 8px;font-size:20px}
+#start p{color:var(--sub);margin:6px 0}
+#start .btns{display:flex;flex-direction:column;gap:8px;margin-top:16px}
+#start .btns button{padding:10px}
+#scanMsg{margin-top:12px;color:var(--sub);min-height:1.5em}
+
+#lb{position:fixed;inset:0;z-index:40;background:rgba(10,10,10,.96);display:grid;grid-template-columns:1fr 320px}
+:root[data-theme=light] #lb{background:rgba(225,225,225,.98)}
+#lbView{position:relative;overflow:hidden;cursor:grab}
+#lbView.drag{cursor:grabbing}
+#lbImg{position:absolute;left:0;top:0;transform-origin:50% 50%;user-select:none;-webkit-user-drag:none;max-width:none}
+#lbImg.flip{scale:-1 1}
+#lbView.gray #lbImg{filter:grayscale(1)}
+#lbSide{background:var(--panel);border-left:1px solid var(--line);overflow:auto;padding:12px}
+#lbSide h2{font-size:13px;margin:0 0 4px;word-break:break-all}
+#lbNav{position:absolute;left:12px;top:12px;display:flex;gap:6px;z-index:2}
+#lbNav button{background:rgba(40,40,40,.8);color:#fff;border-color:#555}
+#lbNav button.on{background:var(--accent);border-color:var(--accent)}
+#lbSim{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px}
+#lbSim img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:4px;cursor:pointer;background:var(--tile)}
+.kbd{font-size:11px;color:var(--sub)}
+
+#modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
+#modal .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;width:min(460px,100%)}
+#modal .box h3{margin:0 0 10px}
+#modal label{display:block;margin:8px 0 2px;color:var(--sub);font-size:12px}
+#modal input[type=text]{width:100%}
+#modal .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+#toast{position:fixed;right:16px;bottom:16px;z-index:60;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:420px}
+#toast.on{opacity:1}
+.empty{color:var(--sub);padding:40px;text-align:center}
+@media (max-width:760px){
+  #app{grid-template-columns:0 1fr}
+  #app.sbopen{grid-template-columns:240px 1fr}
+  #side{display:none}#app.sbopen #side{display:block}
+  #lb{grid-template-columns:1fr;grid-template-rows:1fr 40%}
+  #q{width:140px}
+}
+</style>
+</head>
+<body>
+<div id="app" class="hidden">
+  <header>
+    <button id="btnSide" title="タグ一覧の表示/非表示">☰</button>
+    <input id="q" type="search" placeholder="ファイル名・タグで検索">
+    <label class="row" title="画像の内容をAIで検索（英語で入力）"><input type="checkbox" id="qAI"> AI検索(英語)</label>
+    <select id="sort" title="並び順">
+      <option value="new">新しい順</option><option value="old">古い順</option>
+      <option value="name">名前順</option><option value="random">ランダム</option>
+    </select>
+    <button id="btnShuffle" title="ランダムの並びを変える">⟳</button>
+    <label class="row" title="サムネイルの大きさ">大きさ <input type="range" id="size" min="120" max="460" step="10"></label>
+    <span class="grow"></span>
+    <span id="aiStatus"></span>
+    <button id="btnAI">AIタグ付けを開始</button>
+    <button id="btnMenu">⋯</button>
+  </header>
+  <aside id="side"></aside>
+  <div id="main"><div id="banner"></div><div id="grid"></div><div id="empty" class="empty hidden"></div></div>
+</div>
+
+<div id="selbar" class="hidden">
+  <b id="selN"></b>
+  <input id="selTag" type="text" list="tagList" placeholder="付けるタグ名" style="width:150px">
+  <button id="selAdd" class="primary">タグを付ける</button>
+  <select id="selRemove"><option value="">タグを外す…</option></select>
+  <button id="selFav">★</button>
+  <button id="selAll">全部選ぶ</button>
+  <button id="selClear">選択解除</button>
+</div>
+<datalist id="tagList"></datalist>
+
+<div id="start">
+  <div class="box">
+    <h1>参考資料ボード</h1>
+    <p>PC内の画像フォルダを読み込んで、タグで絞り込んで表示します。</p>
+    <p>元の画像は読むだけで、移動・変更・削除はしません。タグなどの情報はこのブラウザの中に保存されます。</p>
+    <div class="btns">
+      <button id="btnReopen" class="primary hidden"></button>
+      <button id="btnOpen">画像フォルダを選ぶ</button>
+      <input id="dirInput" type="file" webkitdirectory multiple class="hidden">
+    </div>
+    <div id="scanMsg"></div>
+  </div>
+</div>
+
+<div id="lb" class="hidden">
+  <div id="lbView">
+    <div id="lbNav">
+      <button id="lbClose" title="閉じる (Esc)">✕</button>
+      <button id="lbPrev" title="前 (←)">←</button>
+      <button id="lbNext" title="次 (→)">→</button>
+      <button id="lbFit" title="全体表示 (0)">全体</button>
+      <button id="lb100" title="等倍 (1)">等倍</button>
+      <button id="lbFlip" title="左右反転 (H)">反転</button>
+      <button id="lbGray" title="白黒 (G)">白黒</button>
+    </div>
+    <img id="lbImg" alt="">
+  </div>
+  <div id="lbSide"></div>
+</div>
+
+<div id="modal" class="hidden"><div class="box" id="modalBox"></div></div>
+<div id="toast"></div>
+
+<script type="text/plain" id="workerSrc">
+// file:// で開いても動くよう、通常のWorkerから import() で読み込む
+const LIB = 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1/dist/transformers.min.js';
+let T;
+const MODEL = 'Xenova/clip-vit-base-patch16';
+let tok, proc, tm, vm;
+const norm = a => { let s = 0; for (const v of a) s += v * v; s = Math.sqrt(s) || 1; const o = new Float32Array(a.length); for (let i = 0; i < a.length; i++) o[i] = a[i] / s; return o; };
+const progress = p => postMessage({ type: 'progress', p: { status: p.status, file: p.file, loaded: p.loaded, total: p.total } });
+async function load() {
+  T = await import(LIB);
+  T.env.allowLocalModels = false;
+  const { AutoTokenizer, AutoProcessor, CLIPTextModelWithProjection, CLIPVisionModelWithProjection } = T;
+  const combos = [];
+  try {
+    const ad = navigator.gpu && await navigator.gpu.requestAdapter();
+    if (ad) { if (ad.features.has('shader-f16')) combos.push(['webgpu', 'fp16']); combos.push(['webgpu', 'fp32']); }
+  } catch (e) {}
+  combos.push(['wasm', 'q8'], ['wasm', 'fp32']);
+  tok = await AutoTokenizer.from_pretrained(MODEL, { progress_callback: progress });
+  proc = await AutoProcessor.from_pretrained(MODEL, { progress_callback: progress });
+  let err;
+  for (const [device, dtype] of combos) {
+    try {
+      vm = await CLIPVisionModelWithProjection.from_pretrained(MODEL, { device, dtype, progress_callback: progress });
+      tm = await CLIPTextModelWithProjection.from_pretrained(MODEL, { device, dtype, progress_callback: progress });
+      return { device, dtype };
+    } catch (e) { err = e; vm = tm = null; }
+  }
+  throw err;
+}
+async function embedImage(file) {
+  const S = 224;
+  const bmp = await createImageBitmap(file);
+  // 縦長・横長の画像も切らずに見せるため、中間グレーの正方形に収める
+  const sc = Math.min(S / bmp.width, S / bmp.height);
+  const w = Math.max(1, Math.round(bmp.width * sc)), h = Math.max(1, Math.round(bmp.height * sc));
+  const small = await createImageBitmap(bmp, { resizeWidth: w, resizeHeight: h, resizeQuality: 'high' });
+  const dims = [bmp.width, bmp.height];
+  bmp.close();
+  const c = new OffscreenCanvas(S, S), g = c.getContext('2d');
+  g.fillStyle = '#7f7f7f'; g.fillRect(0, 0, S, S);
+  g.drawImage(small, (S - w) >> 1, (S - h) >> 1); small.close();
+  const d = g.getImageData(0, 0, S, S).data;
+  const img = new T.RawImage(new Uint8ClampedArray(d), S, S, 4).rgb();
+  const inputs = await proc(img);
+  const { image_embeds } = await vm(inputs);
+  return { emb: norm(image_embeds.data), dims };
+}
+async function embedText(texts) {
+  const out = [];
+  for (let i = 0; i < texts.length; i += 32) {
+    const inputs = tok(texts.slice(i, i + 32), { padding: true, truncation: true });
+    const { text_embeds } = await tm(inputs);
+    const D = text_embeds.dims[1], data = text_embeds.data;
+    for (let j = 0; j < text_embeds.dims[0]; j++) out.push(norm(data.slice(j * D, (j + 1) * D)));
+  }
+  return out;
+}
+onmessage = async ({ data: m }) => {
+  try {
+    if (m.type === 'load') postMessage({ type: 'ready', ...(await load()) });
+    else if (m.type === 'text') postMessage({ type: 'text', reqId: m.reqId, embs: await embedText(m.texts) });
+    else if (m.type === 'image') postMessage({ type: 'image', reqId: m.reqId, ...(await embedImage(m.file)) });
+  } catch (e) {
+    postMessage({ type: 'error', reqId: m.reqId, during: m.type, message: String(e && e.message || e) });
+  }
+};
+</script>
+
+<script>
+'use strict';
+/* ============ タグの語彙（AIが自動で付けるもの） ============
+   [id, 表示名, 英語の説明文（複数可）]。説明文は画像との近さを測るのに使う。 */
+const VOCAB = [
+  { id: 'kind', label: '種類', mode: 'one', neutral: [], tags: [
+    ['photo', '写真', ['a photograph', 'a photo taken with a camera']],
+    ['illust', 'イラスト', ['a digital illustration', 'an anime style illustration']],
+    ['sketch', '線画・スケッチ', ['a pencil sketch', 'a black and white line drawing']],
+    ['paint', '絵画', ['an oil painting', 'a watercolor painting']],
+    ['cg', '3DCG', ['a 3D render', 'a CGI render']],
+    ['manga', '漫画', ['a manga page with panels', 'a comic page']],
+  ]},
+  { id: 'subj', label: '被写体', mode: 'multi', tags: [
+    ['person', '人物', ['a person', 'a human figure']],
+    ['animal', '動物', ['an animal']],
+    ['land', '風景', ['a landscape scenery', 'nature scenery']],
+    ['city', '建物・街', ['architecture and buildings', 'a city street']],
+    ['room', '室内', ['an interior of a room']],
+    ['plant', '植物・花', ['plants and flowers']],
+    ['mecha', '乗り物・メカ', ['a vehicle', 'a robot or mecha']],
+    ['weapon', '武器', ['a weapon such as a sword or gun']],
+    ['food', '食べ物', ['food']],
+    ['object', '小物・静物', ['a still life of objects']],
+    ['creature', 'クリーチャー', ['a monster or fantasy creature']],
+  ]},
+  { id: 'count', label: '人数', mode: 'one', requires: 'subj:person', neutral: [], tags: [
+    ['1', '1人', ['a single person alone']],
+    ['2', '2人', ['two people together']],
+    ['3', '3人以上', ['a group of people', 'a crowd of people']],
+  ]},
+  { id: 'frame', label: '人物の範囲', mode: 'one', requires: 'subj:person', tags: [
+    ['face', '顔アップ', ['a close-up of a face']],
+    ['bust', 'バストアップ', ['a bust shot portrait, head and shoulders']],
+    ['upper', '上半身', ['an upper body shot from the waist up']],
+    ['full', '全身', ['a full body shot of a person from head to toe']],
+  ]},
+  { id: 'view', label: '向き', mode: 'one', requires: 'subj:person', tags: [
+    ['front', '正面', ['a person facing the viewer, front view']],
+    ['side', '横向き', ['a person in profile, side view']],
+    ['back', '後ろ姿', ['a person seen from behind, back view']],
+    ['tq', '斜め', ['a three-quarter view of a person']],
+  ]},
+  { id: 'pose', label: 'ポーズ', mode: 'multi', requires: 'subj:person', tags: [
+    ['stand', '立ち', ['a person standing']],
+    ['sit', '座り', ['a person sitting']],
+    ['lie', '寝そべり', ['a person lying down']],
+    ['walk', '歩き', ['a person walking']],
+    ['run', '走り', ['a person running']],
+    ['jump', 'ジャンプ', ['a person jumping in mid-air']],
+    ['crouch', 'しゃがみ', ['a person crouching or squatting']],
+    ['fight', 'アクション', ['a dynamic fighting action pose']],
+    ['dance', 'ダンス', ['a person dancing']],
+    ['lookback', '振り返り', ['a person looking back over the shoulder']],
+  ]},
+  { id: 'parts', label: '部位', mode: 'multi', tags: [
+    ['hand', '手', ['a close-up of hands', 'hand gestures']],
+    ['foot', '足', ['a close-up of feet and legs']],
+    ['eye', '目', ['a close-up of an eye']],
+    ['mouth', '口元', ['a close-up of lips and mouth']],
+    ['hair', '髪', ['flowing detailed hair']],
+    ['muscle', '筋肉・肉体', ['a muscular body showing anatomy']],
+  ]},
+  { id: 'expr', label: '表情', mode: 'one', requires: 'subj:person', tags: [
+    ['smile', '笑顔', ['a smiling face']],
+    ['anger', '怒り', ['an angry face']],
+    ['sad', '泣き・悲しみ', ['a crying or sad face']],
+    ['surp', '驚き', ['a surprised face']],
+    ['blank', '無表情', ['a neutral expressionless face']],
+  ]},
+  { id: 'cloth', label: '服装', mode: 'multi', requires: 'subj:person', tags: [
+    ['uniform', '制服', ['a school uniform']],
+    ['kimono', '和服', ['a japanese kimono']],
+    ['dress', 'ドレス', ['an elegant dress']],
+    ['suit', 'スーツ', ['a business suit']],
+    ['armor', '鎧', ['a suit of armor']],
+    ['swim', '水着', ['a swimsuit']],
+    ['casual', '私服', ['casual everyday clothes']],
+    ['fantasy', 'ファンタジー衣装', ['a fantasy costume']],
+    ['military', '軍服', ['a military uniform']],
+  ]},
+  { id: 'angle', label: 'アングル', mode: 'one', tags: [
+    ['high', '俯瞰', ['a high angle shot looking down']],
+    ['low', '煽り', ['a low angle shot looking up']],
+    ['top', '真上', ['a top-down overhead view']],
+    ['eye', '水平', ['an eye level shot']],
+  ]},
+  { id: 'comp', label: '構図', mode: 'multi', tags: [
+    ['wide', '引き・遠景', ['a wide shot of a distant view']],
+    ['macro', '寄り', ['an extreme close-up']],
+    ['sym', '対称', ['a symmetrical composition']],
+    ['persp', '強い遠近', ['strong perspective with a vanishing point and depth']],
+    ['silh', 'シルエット', ['a dark silhouette against a bright background']],
+    ['dutch', '傾き構図', ['a dutch angle with a tilted camera']],
+  ]},
+  { id: 'light', label: '光', mode: 'multi', tags: [
+    ['back', '逆光', ['backlit with light from behind']],
+    ['rim', 'リムライト', ['rim lighting outlining the subject']],
+    ['chiaro', '強い陰影', ['dramatic chiaroscuro lighting with deep shadows']],
+    ['soft', '柔らかい光', ['soft diffused lighting']],
+    ['dapple', '木漏れ日', ['dappled sunlight through leaves']],
+    ['window', '窓の光', ['light coming through a window']],
+    ['spot', 'スポットライト', ['a spotlight in the darkness']],
+    ['neon', 'ネオン', ['glowing neon lights']],
+    ['fire', '火の明かり', ['warm firelight or candlelight']],
+  ]},
+  { id: 'time', label: '時間・天気', mode: 'multi', tags: [
+    ['day', '昼', ['a bright sunny day']],
+    ['sunset', '夕方', ['sunset golden hour']],
+    ['night', '夜', ['a night scene']],
+    ['rain', '雨', ['rain']],
+    ['snow', '雪', ['snow']],
+    ['fog', '霧', ['fog and mist']],
+    ['cloudy', '曇り', ['an overcast cloudy sky']],
+  ]},
+  { id: 'tone', label: '色調', mode: 'multi', tags: [
+    ['mono', 'モノクロ', ['a black and white monochrome image']],
+    ['warm', '暖色', ['a warm color palette with orange and red tones']],
+    ['cool', '寒色', ['a cool color palette with blue tones']],
+    ['vivid', '高彩度', ['vivid saturated colors']],
+    ['muted', '低彩度', ['muted desaturated colors']],
+    ['pastel', 'パステル', ['soft pastel colors']],
+    ['hikey', 'ハイキー', ['a bright high-key image']],
+    ['lokey', 'ローキー', ['a dark low-key image']],
+  ]},
+  { id: 'mat', label: '質感', mode: 'multi', tags: [
+    ['cloth', '布・しわ', ['fabric folds and wrinkles']],
+    ['metal', '金属', ['shiny reflective metal']],
+    ['glass', 'ガラス・透明', ['transparent glass']],
+    ['water', '水・水面', ['water surface with reflections']],
+    ['wood', '木', ['wood texture']],
+    ['stone', '石・岩', ['stone and rock texture']],
+    ['fur', '毛・ファー', ['soft fur']],
+    ['flame', '炎', ['fire and flames']],
+    ['smoke', '煙', ['smoke']],
+  ]},
+];
+const DEFAULT_NEUTRAL = ['an image', 'a picture'];
+const IMG_RE = /\.(jpe?g|png|webp|gif|avif|bmp)$/i;
+const THUMB_W = 420;
+const MODEL_KEY = 'clip-vit-base-patch16';
+
+/* ============ 小道具 ============ */
+const $ = s => document.querySelector(s);
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v;
+    else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k === 'style') e.style.cssText = v;
+    else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const k of kids.flat()) if (k != null && k !== false) e.append(k.nodeType ? k : String(k));
+  return e;
+}
+let toastT;
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('on'), ms); }
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+// 連続して呼ばれても ms ごとに1回は実行する
+const throttle = (fn, ms) => { let t = null, last = 0; return () => { if (t) return; t = setTimeout(() => { t = null; last = Date.now(); fn(); }, Math.max(0, last + ms - Date.now())); }; };
+const dot = (a, b) => { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; };
+function hashStr(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+
+/* ============ 保存（IndexedDB） ============ */
+const DB = {
+  db: null,
+  open() {
+    return new Promise((res, rej) => {
+      const r = indexedDB.open('refboard', 1);
+      r.onupgradeneeded = () => { const d = r.result; for (const s of ['kv', 'items', 'thumbs']) d.createObjectStore(s); };
+      r.onsuccess = () => { this.db = r.result; res(); };
+      r.onerror = () => rej(r.error);
+    });
+  },
+  req(store, mode, fn) {
+    return new Promise((res, rej) => {
+      const t = this.db.transaction(store, mode); const q = fn(t.objectStore(store));
+      t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+    });
+  },
+  get(s, k) { return this.req(s, 'readonly', st => st.get(k)); },
+  put(s, k, v) { return this.req(s, 'readwrite', st => st.put(v, k)); },
+  putMany(s, entries) { return this.req(s, 'readwrite', st => { for (const [k, v] of entries) st.put(v, k); }); },
+  loadPrefix(s, prefix) {
+    return new Promise((res, rej) => {
+      const out = new Map();
+      const t = this.db.transaction(s, 'readonly');
+      const c = t.objectStore(s).openCursor(IDBKeyRange.bound(prefix, prefix + '￿'));
+      c.onsuccess = () => { const cur = c.result; if (cur) { out.set(cur.key, cur.value); cur.continue(); } };
+      t.oncomplete = () => res(out); t.onerror = () => rej(t.error);
+    });
+  },
+};
+
+/* ============ 状態 ============ */
+const S = {
+  root: '', dirHandle: null,
+  items: [], byId: new Map(),
+  view: [], pos: [],
+  settings: { tile: 220, theme: 'dark', sort: 'new', sens: 50, aiAuto: false, collapsed: {}, sidebar: true },
+  custom: [],            // マイタグ [{label, prompt}]
+  seed: Math.random() * 1e9 | 0,
+  F: { inc: new Map(), exc: new Set(), fav: false, untagged: false, text: '' },
+  mode: null,           // {type:'sim', ref} | {type:'search', query, emb} | {type:'cand', tag}
+  sel: new Set(), lastSel: null,
+};
+const TAGS = new Map();   // id -> {id,label,group}
+const GROUPS = [];        // {id,label,mode,requires,tags:[tagId],neutralIdx:[]}
+let PROMPTS = [];         // AI用の英文
+let TEXT = null;          // PROMPTSの埋め込み（AI準備後）
+
+function buildTags() {
+  TAGS.clear(); GROUPS.length = 0; PROMPTS = [];
+  const pidx = new Map();
+  const P = s => { if (!pidx.has(s)) { pidx.set(s, PROMPTS.length); PROMPTS.push(s); } return pidx.get(s); };
+  for (const g of VOCAB) {
+    const G = { id: g.id, label: g.label, mode: g.mode, requires: g.requires, tags: [], neutralIdx: (g.neutral || DEFAULT_NEUTRAL).map(P) };
+    for (const [tid, label, prompts] of g.tags) {
+      const id = g.id + ':' + tid;
+      TAGS.set(id, { id, label, group: g.id, pidx: prompts.map(P) });
+      G.tags.push(id);
+    }
+    GROUPS.push(G);
+  }
+  const my = { id: 'my', label: 'マイタグ', mode: 'free', tags: [], neutralIdx: DEFAULT_NEUTRAL.map(P), custom: true };
+  for (const c of S.custom) {
+    const id = 'my:' + c.label;
+    TAGS.set(id, { id, label: c.label, group: 'my', pidx: c.prompt ? [P(c.prompt)] : [] });
+    my.tags.push(id);
+  }
+  GROUPS.unshift(my);
+  const dirs = new Set();
+  for (const it of S.items) for (const d of it.dirTags) dirs.add(d);
+  const dg = { id: 'dir', label: 'フォルダ', mode: 'none', tags: [] };
+  for (const d of [...dirs].sort()) { TAGS.set(d, { id: d, label: d.slice(4), group: 'dir', pidx: [] }); dg.tags.push(d); }
+  if (dg.tags.length) GROUPS.splice(1, 0, dg);
+  const dl = $('#tagList'); dl.innerHTML = '';
+  const seen = new Set();
+  for (const t of TAGS.values()) if (t.group !== 'dir' && !seen.has(t.label)) { seen.add(t.label); dl.append(el('option', { value: t.label })); }
+}
+const groupOf = id => GROUPS.find(g => g.id === TAGS.get(id)?.group);
+function tagByLabel(label) {
+  label = label.trim(); if (!label) return null;
+  for (const t of TAGS.values()) if (t.label === label && t.group !== 'dir') return t.id;
+  return null;
+}
+async function ensureTag(label) {
+  const id = tagByLabel(label);
+  if (id) return id;
+  S.custom.push({ label: label.trim(), prompt: '' });
+  await saveKV('custom', S.custom);
+  rebuildAfterVocab();
+  return 'my:' + label.trim();
+}
+
+/* ============ AIタグの計算 ============ */
+function thresholds() {
+  const s = S.settings.sens / 100;
+  return { one: 0.70 - 0.45 * s, multi: 0.50 - 0.40 * s, bin: 0.75 - 0.40 * s };
+}
+function computeSims(it) {
+  if (!it.emb || !TEXT) { it.sims = null; return; }
+  const s = new Float32Array(PROMPTS.length);
+  for (let i = 0; i < PROMPTS.length; i++) s[i] = TEXT[i] ? dot(it.emb, TEXT[i]) : 0;
+  it.sims = s;
+}
+function softmax(xs) { const m = Math.max(...xs); const e = xs.map(x => Math.exp(x - m)); const z = e.reduce((a, b) => a + b, 0); return e.map(v => v / z); }
+function computeTags(it, th = thresholds()) {
+  const ai = new Set();
+  const base = new Set([...it.manual, ...it.dirTags]);
+  const has = id => (base.has(id) || ai.has(id)) && !it.rejected.has(id);
+  if (it.sims) {
+    const score = t => { const p = TAGS.get(t).pidx; let s = 0; for (const i of p) s += it.sims[i]; return s / p.length; };
+    for (const g of GROUPS) {
+      if (g.mode === 'none' || (g.requires && !has(g.requires))) continue;
+      const tags = g.tags.filter(t => TAGS.get(t).pidx.length);
+      if (!tags.length) continue;
+      const neutral = g.neutralIdx.reduce((a, i) => a + it.sims[i], 0) / (g.neutralIdx.length || 1);
+      if (g.mode === 'free') {
+        for (const t of tags) { const p = 1 / (1 + Math.exp(-100 * (score(t) - neutral))); if (p >= th.bin) ai.add(t); }
+        continue;
+      }
+      const logits = tags.map(t => 100 * score(t));
+      if (g.neutralIdx.length) logits.push(100 * neutral);
+      const pr = softmax(logits);
+      if (g.mode === 'one') {
+        let bi = 0; for (let i = 1; i < tags.length; i++) if (pr[i] > pr[bi]) bi = i;
+        if (pr[bi] >= th.one) ai.add(tags[bi]);
+      } else {
+        tags.map((t, i) => [t, pr[i]]).filter(x => x[1] >= th.multi).sort((a, b) => b[1] - a[1]).slice(0, 3).forEach(x => ai.add(x[0]));
+      }
+    }
+  }
+  it.ai = ai;
+  const all = new Set();
+  for (const id of [...it.manual, ...it.dirTags, ...ai]) if (!it.rejected.has(id) && TAGS.has(id)) all.add(id);
+  it.tags = all;
+}
+function recomputeAll() { const th = thresholds(); for (const it of S.items) computeTags(it, th); }
+
+/* ============ フォルダ読み込み ============ */
+async function* walk(dir, prefix) {
+  for await (const [name, h] of dir.entries()) {
+    if (h.kind === 'directory') { if (!name.startsWith('.')) yield* walk(h, prefix + name + '/'); }
+    else if (IMG_RE.test(name)) yield { path: prefix + name, handle: h };
+  }
+}
+function newItem(path, size, mtime, src) {
+  const parts = path.split('/');
+  return {
+    id: path, name: parts[parts.length - 1], dirTags: parts.slice(1, -1).map(p => 'dir:' + p),
+    size, mtime, w: 0, h: 0, manual: new Set(), rejected: new Set(), fav: false, emb: null, sims: null,
+    ai: new Set(), tags: new Set(), ...src,
+  };
+}
+async function loadFromHandle(handle) {
+  S.dirHandle = handle; S.root = handle.name;
+  const msg = $('#scanMsg');
+  const found = [];
+  msg.textContent = 'フォルダを読み込み中…';
+  for await (const f of walk(handle, handle.name + '/')) {
+    found.push(f);
+    if (found.length % 200 === 0) msg.textContent = `画像を探しています… ${found.length}枚`;
+  }
+  const items = new Array(found.length);
+  let done = 0;
+  const work = async i => {
+    const f = found[i]; const file = await f.handle.getFile();
+    items[i] = newItem(f.path, file.size, file.lastModified, { handle: f.handle });
+    if (++done % 200 === 0) msg.textContent = `情報を読み込み中… ${done}/${found.length}`;
+  };
+  let next = 0;
+  await Promise.all(Array.from({ length: 16 }, async () => { while (next < found.length) { const i = next++; try { await work(i); } catch (e) { console.warn(e); } } }));
+  await finishLoad(items.filter(Boolean));
+  try { await DB.put('kv', 'lastDir', handle); } catch (e) {}
+}
+async function loadFromFiles(files) {
+  const list = [...files].filter(f => IMG_RE.test(f.name));
+  if (!list.length) { $('#scanMsg').textContent = '画像が見つかりませんでした。'; return; }
+  S.dirHandle = null; S.root = list[0].webkitRelativePath.split('/')[0];
+  await finishLoad(list.map(f => newItem(f.webkitRelativePath, f.size, f.lastModified, { file: f })));
+}
+async function finishLoad(items) {
+  $('#scanMsg').textContent = '保存済みのタグを読み込み中…';
+  const saved = await DB.loadPrefix('items', S.root + '/');
+  for (const it of items) {
+    const r = saved.get(it.id);
+    if (!r) continue;
+    it.manual = new Set(r.manual || []); it.rejected = new Set(r.rejected || []); it.fav = !!r.fav;
+    if (r.size === it.size && r.mtime === it.mtime) { it.w = r.w || 0; it.h = r.h || 0; it.emb = r.emb || null; }
+  }
+  S.items = items; S.byId = new Map(items.map(it => [it.id, it]));
+  for (const t of pool.values()) t.remove(); pool.clear(); S.sel.clear(); S.mode = null; Thumbs.bgIdx = 0;
+  buildTags();
+  if (TEXT) for (const it of items) computeSims(it);
+  recomputeAll();
+  $('#start').classList.add('hidden'); $('#app').classList.remove('hidden');
+  document.title = `参考資料ボード - ${S.root}`;
+  refresh();
+  toast(`${items.length}枚を読み込みました`);
+  if (S.settings.aiAuto) AI.start();
+  updateAIStatus();
+  Thumbs.background();
+}
+
+/* ============ 保存のまとめ書き ============ */
+const dirty = new Set();
+function markDirty(it) { dirty.add(it.id); flushSoon(); }
+const flushSoon = debounce(flush, 800);
+async function flush() {
+  if (!dirty.size) return;
+  const ids = [...dirty]; dirty.clear();
+  const entries = ids.map(id => S.byId.get(id)).filter(Boolean).map(it => [it.id, {
+    size: it.size, mtime: it.mtime, w: it.w, h: it.h, manual: [...it.manual], rejected: [...it.rejected], fav: it.fav, emb: it.emb,
+  }]);
+  try { await DB.putMany('items', entries); } catch (e) { console.error(e); toast('保存に失敗しました: ' + e.message, 5000); }
+}
+addEventListener('beforeunload', () => { flush(); });
+async function saveKV(k, v) { try { await DB.put('kv', k, v); } catch (e) { console.error(e); } }
+const saveSettings = debounce(() => saveKV('settings', S.settings), 300);
+
+/* ============ 絞り込みと並び替え ============ */
+function matches(it, skipGroup) {
+  const F = S.F;
+  if (F.fav && !it.fav) return false;
+  if (F.untagged && it.manual.size) return false;
+  for (const [g, set] of F.inc) {
+    if (g === skipGroup || !set.size) continue;
+    let ok = false; for (const t of set) if (it.tags.has(t)) { ok = true; break; }
+    if (!ok) return false;
+  }
+  for (const t of F.exc) if (it.tags.has(t)) return false;
+  if (F.text) {
+    const q = F.text.toLowerCase();
+    if (!it.id.toLowerCase().includes(q)) {
+      let ok = false; for (const t of it.tags) if (TAGS.get(t).label.toLowerCase().includes(q)) { ok = true; break; }
+      if (!ok) return false;
+    }
+  }
+  if (S.mode?.type === 'cand' && it.tags.has(S.mode.tag)) return false;
+  return true;
+}
+function centroidOf(tag) {
+  const ex = S.items.filter(it => it.emb && it.manual.has(tag));
+  if (ex.length < 2) return null;
+  const c = new Float32Array(ex[0].emb.length);
+  for (const it of ex) for (let i = 0; i < c.length; i++) c[i] += it.emb[i];
+  let n = Math.sqrt(dot(c, c)) || 1; for (let i = 0; i < c.length; i++) c[i] /= n;
+  return c;
+}
+function computeView() {
+  let v = S.items.filter(it => matches(it));
+  const m = S.mode;
+  if (m) {
+    let key = null;
+    if (m.type === 'sim') { const ref = S.byId.get(m.ref); if (ref?.emb) key = ref.emb; }
+    else if (m.type === 'search') key = m.emb;
+    if (key) {
+      const sc = new Map(v.filter(it => it.emb).map(it => [it, dot(it.emb, key)]));
+      v = v.filter(it => sc.has(it)).sort((a, b) => sc.get(b) - sc.get(a));
+      if (m.type === 'sim') v = v.filter(it => it.id !== m.ref);
+      S.view = v; return;
+    }
+    if (m.type === 'cand') {
+      const t = TAGS.get(m.tag); const cen = centroidOf(m.tag);
+      const score = it => {
+        let s = -1;
+        if (it.sims && t.pidx.length) s = Math.max(s, t.pidx.reduce((a, i) => a + it.sims[i], 0) / t.pidx.length * 2.5);
+        if (cen) s = Math.max(s, dot(it.emb, cen));
+        return s;
+      };
+      const sc = new Map(v.filter(it => it.emb).map(it => [it, score(it)]));
+      v = v.filter(it => sc.has(it)).sort((a, b) => sc.get(b) - sc.get(a));
+      S.view = v; return;
+    }
+  }
+  const s = S.settings.sort;
+  if (s === 'new') v.sort((a, b) => b.mtime - a.mtime);
+  else if (s === 'old') v.sort((a, b) => a.mtime - b.mtime);
+  else if (s === 'name') v.sort((a, b) => a.id.localeCompare(b.id, 'ja', { numeric: true }));
+  else { const k = new Map(v.map(it => [it, hashStr(it.id + S.seed)])); v.sort((a, b) => k.get(a) - k.get(b)); }
+  S.view = v;
+}
+function refresh() {
+  computeView();
+  layout();
+  renderSide();
+  renderBanner();
+  renderSelbar();
+}
+const refreshSoon = debounce(refresh, 400);
+const refreshAI = throttle(refresh, 2500);
+
+/* ============ ボード（石積みレイアウト・見える分だけ描画） ============ */
+const GAP = 10;
+const pool = new Map();
+function layout() {
+  const grid = $('#grid'); const W = grid.clientWidth || ($('#main').clientWidth - 24);
+  const tw = S.settings.tile;
+  const cols = Math.max(1, Math.floor((W + GAP) / (tw + GAP)));
+  const cw = (W - (cols - 1) * GAP) / cols;
+  const ys = new Array(cols).fill(0);
+  S.pos = S.view.map(it => {
+    let c = 0; for (let i = 1; i < cols; i++) if (ys[i] < ys[c] - 1) c = i;
+    const h = it.w ? Math.min(cw * it.h / it.w, cw * 3) : cw * 1.3;
+    const p = { x: c * (cw + GAP), y: ys[c], w: cw, h };
+    ys[c] += h + GAP; return p;
+  });
+  grid.style.height = Math.max(0, ...ys) + 'px';
+  const empty = $('#empty');
+  if (!S.view.length) {
+    empty.classList.remove('hidden');
+    empty.textContent = S.mode?.type === 'cand' ? '候補がありません（AI解析済みの画像が必要です）'
+      : S.mode && !S.items.some(it => it.emb) ? 'AI解析が済んだ画像がまだありません' : '条件に合う画像がありません';
+  } else empty.classList.add('hidden');
+  renderTiles(true);
+}
+let rafPending = false;
+function renderTiles(force) {
+  if (rafPending && !force) return;
+  rafPending = true;
+  requestAnimationFrame(() => {
+    rafPending = false;
+    const main = $('#main'), grid = $('#grid');
+    const top = main.scrollTop - grid.offsetTop, vh = main.clientHeight, buf = vh;
+    const want = new Set();
+    const vis = [];
+    for (let i = 0; i < S.view.length; i++) {
+      const p = S.pos[i];
+      if (p.y + p.h < top - buf || p.y > top + vh + buf) continue;
+      const it = S.view[i]; want.add(it.id);
+      let t = pool.get(it.id);
+      if (!t) { t = makeTile(it); pool.set(it.id, t); grid.append(t); }
+      t.style.transform = `translate(${p.x}px,${p.y}px)`; t.style.width = p.w + 'px'; t.style.height = p.h + 'px';
+      t.classList.toggle('sel', S.sel.has(it.id));
+      t.querySelector('.st').classList.toggle('on', it.fav);
+      if (p.y + p.h >= top && p.y <= top + vh) vis.push(it);
+    }
+    for (const [id, t] of pool) if (!want.has(id)) { t.remove(); pool.delete(id); }
+    Thumbs.visible = vis;
+    for (const it of vis) Thumbs.request(it, true);
+    for (const id of want) Thumbs.request(S.byId.get(id), false);
+    AI.visible = vis;
+  });
+}
+function makeTile(it) {
+  const img = el('img', { alt: '', decoding: 'async' });
+  img.onload = () => img.classList.add('ld');
+  const st = el('button', { class: 'st', title: 'お気に入り', onclick: e => { e.stopPropagation(); toggleFav([it]); } }, '★');
+  const t = el('div', { class: 'tile', 'data-id': it.id }, img, el('div', { class: 'ov' }, el('div', { class: 'nm' }, it.name)), st);
+  t.addEventListener('click', e => onTileClick(e, it));
+  const u = Thumbs.cached(it); if (u) img.src = u;
+  return t;
+}
+function onTileClick(e, it) {
+  if (e.ctrlKey || e.metaKey || ((S.sel.size || S.mode?.type === 'cand') && !e.shiftKey)) {
+    S.sel.has(it.id) ? S.sel.delete(it.id) : S.sel.add(it.id); S.lastSel = it.id;
+  } else if (e.shiftKey) {
+    const a = S.view.findIndex(x => x.id === S.lastSel), b = S.view.indexOf(it);
+    if (a < 0) S.sel.add(it.id);
+    else for (let i = Math.min(a, b); i <= Math.max(a, b); i++) S.sel.add(S.view[i].id);
+    S.lastSel = it.id;
+  } else { Lightbox.open(it); return; }
+  renderTiles(true); renderSelbar();
+}
+
+/* ============ サムネイル ============ */
+const Thumbs = {
+  urls: new Map(), pending: new Map(), queue: [], running: 0, visible: [], bgIdx: 0,
+  cached(it) { const u = this.urls.get(it.id); if (u) { this.urls.delete(it.id); this.urls.set(it.id, u); } return u; },
+  request(it, hi) {
+    if (!it || this.urls.has(it.id) || this.pending.has(it.id)) return;
+    this.pending.set(it.id, true);
+    hi ? this.queue.unshift(it) : this.queue.push(it);
+    this.pump();
+  },
+  pump() {
+    while (this.running < 4 && this.queue.length) {
+      const it = this.queue.shift(); this.running++;
+      this.load(it).catch(e => { it.thumbFail = true; console.warn(it.id, e); }).finally(() => { this.running--; this.pending.delete(it.id); this.pump(); });
+    }
+    if (!this.running && !this.queue.length) this.background();
+  },
+  async load(it) {
+    if (!pool.has(it.id) && !this.bgItem(it)) return;
+    const rec = await this.rec(it);
+    if (!pool.has(it.id)) return;
+    const u = URL.createObjectURL(rec.blob);
+    this.urls.set(it.id, u); this.trim();
+    const img = pool.get(it.id)?.querySelector('img'); if (img && !img.src) img.src = u;
+  },
+  // サムネイルを保存領域から出す。無ければ元画像から作って保存する
+  async rec(it) {
+    const sig = it.size + '_' + it.mtime;
+    let rec = null;
+    try { rec = await DB.get('thumbs', it.id); } catch (e) {}
+    if (!rec || rec.sig !== sig) {
+      const file = await getFile(it);
+      const bmp = await createImageBitmap(file);
+      const w = bmp.width, h = bmp.height;
+      const tw = Math.min(THUMB_W, w), th = Math.max(1, Math.round(h * tw / w));
+      const sm = await createImageBitmap(bmp, { resizeWidth: tw, resizeHeight: th, resizeQuality: 'high' }); bmp.close();
+      const c = new OffscreenCanvas(tw, th); c.getContext('2d').drawImage(sm, 0, 0); sm.close();
+      const blob = await c.convertToBlob({ type: 'image/webp', quality: 0.85 });
+      rec = { sig, blob, w, h };
+      DB.put('thumbs', it.id, rec).catch(() => {});
+    }
+    if (it.w !== rec.w || it.h !== rec.h) { it.w = rec.w; it.h = rec.h; markDirty(it); relayoutSoon(); }
+    return rec;
+  },
+  bgItem(it) { return this.bgMode && !it.w; },
+  trim() {
+    if (this.urls.size <= 900) return;
+    for (const [id, u] of this.urls) {
+      if (this.urls.size <= 700) break;
+      if (!pool.has(id)) { URL.revokeObjectURL(u); this.urls.delete(id); }
+    }
+  },
+  // 見えていない画像も少しずつ縦横比を調べ、並びのずれを減らす
+  background() {
+    if (this.bgTimer) return;
+    this.bgTimer = setTimeout(async () => {
+      this.bgTimer = null; this.bgMode = true;
+      let n = 0;
+      while (this.bgIdx < S.view.length && n < 12) {
+        const it = S.view[this.bgIdx++];
+        if (!it.w && !it.thumbFail && !this.pending.has(it.id)) { n++; this.request(it, false); }
+      }
+      if (this.bgIdx >= S.view.length) { this.bgIdx = S.view.findIndex(it => !it.w && !it.thumbFail); if (this.bgIdx < 0) { this.bgIdx = S.view.length; this.bgMode = false; } }
+    }, 300);
+  },
+};
+async function getFile(it) { return it.handle ? await it.handle.getFile() : it.file; }
+const relayoutSoon = throttle(() => layout(), 500);
+
+/* ============ AI（ブラウザ内CLIP） ============ */
+const AI = {
+  worker: null, state: 'off', info: null, queue: [], busy: false, paused: false, visible: [], reqs: new Map(), rid: 0,
+  files: new Map(), done: 0, err: '',
+  call(msg) { return new Promise((res, rej) => { const id = ++this.rid; this.reqs.set(id, { res, rej }); this.worker.postMessage({ ...msg, reqId: id }); }); },
+  start() {
+    if (this.worker) { this.paused = false; this.pump(); updateAIStatus(); return; }
+    S.settings.aiAuto = true; saveSettings();
+    this.state = 'loading'; updateAIStatus();
+    const src = window.__rbWorkerSrc || $('#workerSrc').textContent;
+    this.worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    this.worker.onmessage = e => this.onMsg(e.data);
+    this.worker.onerror = e => { this.fail('AIの読み込みに失敗しました（ネット接続を確認してください）'); console.error(e); };
+    this.worker.postMessage({ type: 'load' });
+  },
+  fail(msg) { this.state = 'error'; this.err = msg; this.worker?.terminate(); this.worker = null; updateAIStatus(); toast(msg, 6000); },
+  async onMsg(m) {
+    if (m.type === 'progress') {
+      const p = m.p; if (p.file && p.total) this.files.set(p.file, [p.loaded || 0, p.total]);
+      if (p.status === 'done' && p.file && this.files.has(p.file)) { const f = this.files.get(p.file); f[0] = f[1]; }
+      updateAIStatus(); return;
+    }
+    if (m.type === 'ready') { this.info = m; await this.prepareText(); return; }
+    const r = this.reqs.get(m.reqId);
+    if (m.type === 'error') {
+      if (r) { this.reqs.delete(m.reqId); r.rej(new Error(m.message)); }
+      else this.fail('AIの準備に失敗しました（ネット接続を確認して「AIを再試行」）: ' + m.message);
+      return;
+    }
+    if (r) { this.reqs.delete(m.reqId); r.res(m); }
+  },
+  async embedTexts(texts) {
+    const cache = (await DB.get('kv', 'text:' + MODEL_KEY)) || {};
+    const need = texts.filter(t => !cache[t]);
+    if (need.length) { const { embs } = await this.call({ type: 'text', texts: need }); need.forEach((t, i) => cache[t] = embs[i]); await saveKV('text:' + MODEL_KEY, cache); }
+    return texts.map(t => cache[t]);
+  },
+  async prepareText() {
+    try { TEXT = await this.embedTexts(PROMPTS); }
+    catch (e) { this.fail('AIの準備に失敗しました: ' + e.message); return; }
+    this.state = 'ready';
+    for (const it of S.items) computeSims(it);
+    recomputeAll(); refresh(); updateAIStatus();
+    this.pump();
+  },
+  next() {
+    for (const it of this.visible) if (!it.emb && !it.aiFail) return it;
+    for (const it of S.view) if (!it.emb && !it.aiFail) return it;
+    for (const it of S.items) if (!it.emb && !it.aiFail) return it;
+    return null;
+  },
+  async pump() {
+    if (this.busy || this.paused || this.state !== 'ready') return;
+    const it = this.next();
+    if (!it) { updateAIStatus(); return; }
+    this.busy = true;
+    try {
+      const file = await getFile(it);
+      const r = await this.call({ type: 'image', file });
+      it.emb = r.emb;
+      if (r.dims && (!it.w || !it.h)) { it.w = r.dims[0]; it.h = r.dims[1]; relayoutSoon(); }
+      computeSims(it); computeTags(it); markDirty(it); this.done++;
+      refreshAI();
+    } catch (e) { it.aiFail = true; console.warn('AI解析に失敗', it.id, e); }
+    this.busy = false; updateAIStatus();
+    setTimeout(() => this.pump(), 0);
+  },
+};
+function fmtMB(b) { return (b / 1048576).toFixed(0) + 'MB'; }
+function updateAIStatus() {
+  const s = $('#aiStatus'), b = $('#btnAI');
+  if (AI.state === 'off') { s.textContent = ''; b.textContent = 'AIタグ付けを開始'; b.classList.remove('hidden'); return; }
+  if (AI.state === 'error') { s.textContent = AI.err; b.textContent = 'AIを再試行'; b.classList.remove('hidden'); return; }
+  if (AI.state === 'loading') {
+    let l = 0, t = 0; for (const [a, c] of AI.files.values()) { l += a; t += c; }
+    s.textContent = t ? `AIモデルを準備中… ${fmtMB(l)} / ${fmtMB(t)}（初回のみ）` : 'AIモデルを準備中…';
+    b.classList.add('hidden'); return;
+  }
+  const total = S.items.length, n = S.items.filter(it => it.emb).length;
+  const fails = S.items.filter(it => it.aiFail).length;
+  b.classList.remove('hidden');
+  if (n + fails >= total) { s.textContent = `AI解析済み ${n}/${total}` + (fails ? `（読めない画像 ${fails}）` : ''); b.classList.add('hidden'); }
+  else { s.textContent = `AI解析中 ${n}/${total}` + (AI.paused ? '（一時停止）' : ''); b.textContent = AI.paused ? '再開' : '一時停止'; }
+}
+$('#btnAI').onclick = () => {
+  if (AI.state === 'ready' && !AI.paused) { AI.paused = true; updateAIStatus(); return; }
+  if (AI.state === 'error') { AI.state = 'off'; }
+  AI.start();
+};
+
+/* ============ サイドバー（タグで絞り込み） ============ */
+function renderSide() {
+  const side = $('#side'); const keep = side.scrollTop; side.innerHTML = '';
+  const F = S.F;
+  const active = F.fav || F.untagged || F.exc.size || [...F.inc.values()].some(s => s.size);
+  side.append(el('div', { class: 'sec' },
+    el('div', { class: 'row' },
+      el('b', null, `${S.view.length.toLocaleString()} 枚`), el('span', { class: 'hint' }, `/ ${S.items.length.toLocaleString()}`),
+      active ? el('button', { style: 'margin-left:auto', onclick: () => { F.inc.clear(); F.exc.clear(); F.fav = F.untagged = false; refresh(); } }, '条件を全部外す') : null),
+    el('div', { class: 'hint' }, 'クリック：絞り込み（同じ見出しの中は「どれか」、見出し同士は「全部」）／ Alt+クリック：除外'),
+  ));
+  const base = S.items.filter(it => matches(it));
+  side.append(el('div', { class: 'sec' }, el('div', { class: 'chips' },
+    el('span', { class: 'chip' + (F.fav ? ' on' : ''), onclick: () => { F.fav = !F.fav; refresh(); } }, '★ お気に入り', el('span', { class: 'c' }, base.filter(i => i.fav).length)),
+    el('span', { class: 'chip' + (F.untagged ? ' on' : ''), title: '自分でタグを付けていない画像', onclick: () => { F.untagged = !F.untagged; refresh(); } }, '手動タグなし'),
+  )));
+  let hiddenGroups = 0;
+  for (const g of GROUPS) {
+    if (!g.tags.length && !g.custom) continue;
+    const pool = S.items.filter(it => matches(it, g.id));
+    const counts = new Map();
+    for (const it of pool) for (const t of it.tags) if (TAGS.get(t).group === g.id) counts.set(t, (counts.get(t) || 0) + 1);
+    const inc = F.inc.get(g.id) || new Set();
+    // AIのタグがまだ無い見出しは隠す（0件ばかり並ぶと探しにくいため）
+    if (!g.custom && g.id !== 'dir' && !counts.size && !inc.size && !g.tags.some(t => F.exc.has(t))) { hiddenGroups++; continue; }
+    const collapsed = S.settings.collapsed[g.id];
+    const chips = g.tags.map(t => {
+      const n = counts.get(t) || 0, on = inc.has(t), ex = F.exc.has(t);
+      return el('span', {
+        class: 'chip' + (on ? ' on' : '') + (ex ? ' ex' : '') + (!n && !on && !ex ? ' zero' : ''),
+        title: 'Alt+クリックで除外／右クリックで候補を探す',
+        onclick: e => toggleFilter(g.id, t, e.altKey),
+        oncontextmenu: e => { e.preventDefault(); openCand(t); },
+      }, TAGS.get(t).label, el('span', { class: 'c' }, n));
+    });
+    const sec = el('div', { class: 'sec' + (collapsed ? ' collapsed' : ''), 'data-g': g.id },
+      el('h3', { onclick: () => { S.settings.collapsed[g.id] = !collapsed; saveSettings(); renderSide(); } },
+        (collapsed ? '▸ ' : '▾ ') + g.label, g.requires ? el('span', { class: 'hint' }, '（人物）') : null,
+        g.custom ? el('button', { style: 'padding:0 6px', title: 'マイタグを追加', onclick: e => { e.stopPropagation(); editCustom(); } }, '＋') : null,
+        el('span', { class: 'n' }, inc.size ? `${inc.size}選択` : '')),
+      el('div', { class: 'chips' }, chips.length ? chips : el('span', { class: 'hint' }, '画像を開いてタグを入力すると、ここに増えます')));
+    side.append(sec);
+  }
+  if (hiddenGroups) side.append(el('div', { class: 'hint sec' }, AI.state === 'ready'
+    ? `該当する画像が無い見出し（${hiddenGroups}個）は隠しています。`
+    : `「AIタグ付けを開始」すると、種類・ポーズ・光・色調などのタグ（${hiddenGroups}項目）が自動で付きます。`));
+  const th = el('input', { type: 'range', min: 0, max: 100, value: S.settings.sens, oninput: e => { S.settings.sens = +e.target.value; saveSettings(); recomputeAllSoon(); } });
+  side.append(el('div', { class: 'sec' }, el('h3', null, 'AIタグの付けやすさ'),
+    el('div', { class: 'row' }, el('span', { class: 'hint' }, '少なめ'), th, el('span', { class: 'hint' }, '多め')),
+    el('div', { class: 'hint' }, '点線のタグはAIが付けたもの。画像を開いて ✕ で外せます。タグを右クリックすると、そのタグが合いそうな画像を探せます。')));
+  side.scrollTop = keep;
+}
+const recomputeAllSoon = debounce(() => { recomputeAll(); refresh(); }, 200);
+function toggleFilter(g, t, exclude) {
+  const F = S.F;
+  if (exclude) { F.exc.has(t) ? F.exc.delete(t) : F.exc.add(t); F.inc.get(g)?.delete(t); }
+  else {
+    F.exc.delete(t);
+    if (!F.inc.has(g)) F.inc.set(g, new Set());
+    const s = F.inc.get(g); s.has(t) ? s.delete(t) : s.add(t);
+  }
+  $('#main').scrollTop = 0; Thumbs.bgIdx = 0; refresh();
+}
+function openCand(t) {
+  if (!S.items.some(it => it.emb)) { toast('候補探しには、先にAI解析が必要です'); return; }
+  S.mode = { type: 'cand', tag: t }; S.sel.clear(); $('#main').scrollTop = 0; refresh();
+}
+function renderBanner() {
+  const b = $('#banner'); b.innerHTML = '';
+  const m = S.mode; if (!m) return;
+  const close = el('button', { onclick: () => { S.mode = null; $('#q').value = ''; S.F.text = ''; refresh(); } }, '✕ 元の表示に戻る');
+  if (m.type === 'sim') {
+    const ref = S.byId.get(m.ref);
+    b.append(el('img', { src: Thumbs.cached(ref) || '', style: 'height:36px;border-radius:4px' }), el('span', null, `「${ref?.name}」に似ている順`), close);
+  } else if (m.type === 'search') b.append(el('span', null, `AI検索：「${m.query}」に近い順`), close);
+  else if (m.type === 'cand') {
+    const t = TAGS.get(m.tag);
+    b.append(el('span', null, `「${t.label}」が合いそうな順（まだ付いていない画像）。クリックで選んで、下の「タグを付ける」で付けます。`), close);
+    $('#selTag').value = t.label;
+  }
+}
+
+/* ============ 選択とまとめてタグ付け ============ */
+function renderSelbar() {
+  const bar = $('#selbar');
+  if (!S.sel.size) { bar.classList.add('hidden'); return; }
+  bar.classList.remove('hidden');
+  $('#selN').textContent = `${S.sel.size}枚選択中`;
+  const r = $('#selRemove'); r.innerHTML = '<option value="">タグを外す…</option>';
+  const ts = new Map();
+  for (const id of S.sel) for (const t of S.byId.get(id).tags) if (TAGS.get(t).group !== 'dir') ts.set(t, (ts.get(t) || 0) + 1);
+  for (const [t, n] of [...ts].sort((a, b) => b[1] - a[1])) r.append(el('option', { value: t }, `${TAGS.get(t).label} (${n})`));
+}
+$('#selAdd').onclick = async () => {
+  const label = $('#selTag').value.trim(); if (!label) { $('#selTag').focus(); return; }
+  const id = await ensureTag(label);
+  for (const sid of S.sel) { const it = S.byId.get(sid); it.manual.add(id); it.rejected.delete(id); computeTags(it); markDirty(it); }
+  toast(`${S.sel.size}枚に「${label}」を付けました`);
+  S.sel.clear(); refresh();
+};
+$('#selTag').addEventListener('keydown', e => { if (e.key === 'Enter') $('#selAdd').click(); });
+$('#selRemove').onchange = e => {
+  const t = e.target.value; if (!t) return;
+  for (const sid of S.sel) removeTag(S.byId.get(sid), t);
+  toast(`「${TAGS.get(t).label}」を外しました`); refresh();
+};
+$('#selFav').onclick = () => toggleFav([...S.sel].map(id => S.byId.get(id)));
+$('#selAll').onclick = () => { for (const it of S.view) S.sel.add(it.id); renderTiles(true); renderSelbar(); };
+$('#selClear').onclick = () => { S.sel.clear(); renderTiles(true); renderSelbar(); };
+function removeTag(it, t) {
+  if (it.manual.has(t)) it.manual.delete(t);
+  if (it.ai.has(t)) it.rejected.add(t);
+  computeTags(it); markDirty(it);
+}
+function toggleFav(list) {
+  const v = !list.every(it => it.fav);
+  for (const it of list) { it.fav = v; markDirty(it); }
+  renderTiles(true); if (S.F.fav) refresh(); else renderSide();
+  if (Lightbox.it) Lightbox.renderSide();
+}
+
+/* ============ 拡大表示 ============ */
+const Lightbox = {
+  it: null, url: null, z: 1, x: 0, y: 0, nw: 0, nh: 0,
+  open(it) {
+    this.it = it; $('#lb').classList.remove('hidden');
+    const img = $('#lbImg'); img.removeAttribute('src');
+    if (this.url) URL.revokeObjectURL(this.url);
+    const thumb = Thumbs.cached(it); if (thumb) img.src = thumb;
+    getFile(it).then(f => { if (this.it !== it) return; this.url = URL.createObjectURL(f); img.src = this.url; });
+    img.onload = () => { this.nw = img.naturalWidth; this.nh = img.naturalHeight; if (img.src === this.url || !this.fitted) this.fit(); this.fitted = img.src === this.url; };
+    this.fitted = false;
+    this.renderSide();
+  },
+  close() { $('#lb').classList.add('hidden'); if (this.url) URL.revokeObjectURL(this.url); this.url = null; this.it = null; renderTiles(true); },
+  step(d) { const i = S.view.indexOf(this.it); const n = S.view[i + d]; if (n) this.open(n); },
+  fit() {
+    const v = $('#lbView'); const W = v.clientWidth, H = v.clientHeight;
+    const nw = this.nw || 1, nh = this.nh || 1;
+    // 表示中がサムネイルでも、元画像の大きさを基準に「全体表示（拡大はしない）」にする
+    const rw = this.it?.w || nw, rh = this.it?.h || nh;
+    const TOP = 56; // 上のボタン列と重ならないように空ける
+    this.z = Math.min((W - 24) / rw, (H - TOP - 12) / rh, 1) * rw / nw;
+    this.x = (W - nw * this.z) / 2; this.y = TOP + (H - TOP - 12 - nh * this.z) / 2; this.apply();
+  },
+  actual() {
+    const v = $('#lbView'); const k = this.it?.w && this.nw ? this.it.w / this.nw : 1;
+    const z = k, cx = v.clientWidth / 2, cy = v.clientHeight / 2;
+    this.x = cx - (cx - this.x) * z / this.z; this.y = cy - (cy - this.y) * z / this.z; this.z = z; this.apply();
+  },
+  apply() { const i = $('#lbImg'); i.style.width = this.nw * this.z + 'px'; i.style.height = this.nh * this.z + 'px'; i.style.translate = `${this.x}px ${this.y}px`; },
+  renderSide() {
+    const it = this.it; if (!it) return;
+    const side = $('#lbSide'); side.innerHTML = '';
+    const chips = [...it.tags].sort((a, b) => GROUPS.indexOf(groupOf(a)) - GROUPS.indexOf(groupOf(b))).map(t => {
+      const tg = TAGS.get(t), isAI = it.ai.has(t) && !it.manual.has(t), isDir = tg.group === 'dir';
+      return el('span', { class: 'chip' + (isAI ? ' ai' : ''), title: isAI ? 'AIが付けたタグ' : isDir ? 'フォルダ名から' : '手動で付けたタグ' },
+        (isDir ? '📁 ' : '') + tg.label,
+        isDir ? null : el('span', { class: 'x', title: '外す', onclick: () => { removeTag(it, t); this.renderSide(); refreshSoon(); } }, '✕'));
+    });
+    const rejected = [...it.rejected].filter(t => TAGS.has(t)).map(t => el('span', { class: 'chip zero', title: 'クリックで戻す', onclick: () => { it.rejected.delete(t); computeTags(it); markDirty(it); this.renderSide(); refreshSoon(); } }, TAGS.get(t).label));
+    const inp = el('input', { type: 'text', list: 'tagList', placeholder: 'タグを追加（Enter）', style: 'width:100%' });
+    inp.addEventListener('keydown', async e => {
+      if (e.key !== 'Enter' || !inp.value.trim()) return;
+      const id = await ensureTag(inp.value); it.manual.add(id); it.rejected.delete(id); computeTags(it); markDirty(it);
+      this.renderSide(); refreshSoon(); $('#lbSide input').focus();
+    });
+    const kb = f => f.size < 1048576 ? Math.round(f.size / 1024) + 'KB' : (f.size / 1048576).toFixed(1) + 'MB';
+    side.append(...[
+      el('h2', null, it.name),
+      el('div', { class: 'hint' }, it.id.split('/').slice(0, -1).join(' / ')),
+      el('div', { class: 'hint' }, (it.w ? `${it.w} × ${it.h} px ・ ` : '') + kb(it) + ' ・ ' + new Date(it.mtime).toLocaleDateString('ja-JP')),
+      el('div', { class: 'row', style: 'margin:10px 0' },
+        el('button', { class: it.fav ? 'primary' : '', onclick: () => toggleFav([it]) }, it.fav ? '★ お気に入り' : '☆ お気に入り'),
+        el('button', { onclick: () => this.similarBoard(), disabled: !it.emb }, '似た画像をボードで')),
+      el('div', { class: 'chips' }, chips.length ? chips : el('span', { class: 'hint' }, 'タグはまだありません')),
+      el('div', { style: 'margin-top:8px' }, inp),
+      rejected.length ? el('div', { style: 'margin-top:8px' }, el('div', { class: 'hint' }, '外したAIタグ（クリックで戻す）'), el('div', { class: 'chips' }, rejected)) : null,
+      el('h3', { style: 'font-size:12px;color:var(--sub);margin:16px 0 0' }, '似ている画像'),
+      it.emb ? el('div', { id: 'lbSim' }) : el('div', { class: 'hint' }, 'AI解析が済むと表示されます'),
+      el('div', { class: 'kbd', style: 'margin-top:16px' }, '← → 移動 / ホイール 拡大縮小 / ドラッグ 移動 / 0 全体 / 1 等倍 / H 反転 / G 白黒 / F お気に入り / S 似た画像 / Esc 閉じる'),
+    ].filter(Boolean));
+    if (it.emb) {
+      const box = $('#lbSim');
+      const sims = S.items.filter(o => o.emb && o !== it).map(o => [o, dot(o.emb, it.emb)]).sort((a, b) => b[1] - a[1]).slice(0, 18);
+      for (const [o] of sims) {
+        const im = el('img', { title: o.name, onclick: () => this.open(o) });
+        box.append(im);
+        const u = Thumbs.cached(o); if (u) im.src = u; else simThumb(o, im);
+      }
+    }
+  },
+  similarBoard() { if (!this.it?.emb) return; S.mode = { type: 'sim', ref: this.it.id }; this.close(); $('#main').scrollTop = 0; refresh(); },
+};
+function toggleFlip() { $('#lbFlip').classList.toggle('on', $('#lbImg').classList.toggle('flip')); }
+function toggleGray() { $('#lbGray').classList.toggle('on', $('#lbView').classList.toggle('gray')); }
+async function simThumb(it, img) {
+  try { const r = await Thumbs.rec(it); const u = URL.createObjectURL(r.blob); img.onload = () => URL.revokeObjectURL(u); img.src = u; } catch (e) {}
+}
+(() => {
+  const v = $('#lbView'); let drag = null;
+  v.addEventListener('wheel', e => {
+    e.preventDefault(); const L = Lightbox; const r = v.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top, k = Math.exp(-e.deltaY * 0.0015);
+    const z = Math.min(Math.max(L.z * k, 0.02), 40);
+    L.x = mx - (mx - L.x) * z / L.z; L.y = my - (my - L.y) * z / L.z; L.z = z; L.apply();
+  }, { passive: false });
+  v.addEventListener('pointerdown', e => { if (e.target.closest('button')) return; drag = { x: e.clientX, y: e.clientY, ox: Lightbox.x, oy: Lightbox.y, moved: false }; v.setPointerCapture(e.pointerId); v.classList.add('drag'); });
+  v.addEventListener('pointermove', e => { if (!drag) return; Lightbox.x = drag.ox + e.clientX - drag.x; Lightbox.y = drag.oy + e.clientY - drag.y; Lightbox.apply(); });
+  v.addEventListener('pointerup', () => { drag = null; v.classList.remove('drag'); });
+  v.addEventListener('dblclick', e => { if (!e.target.closest('button')) Lightbox.fit(); });
+  $('#lbClose').onclick = () => Lightbox.close();
+  $('#lbPrev').onclick = () => Lightbox.step(-1);
+  $('#lbNext').onclick = () => Lightbox.step(1);
+  $('#lbFit').onclick = () => Lightbox.fit();
+  $('#lb100').onclick = () => Lightbox.actual();
+  $('#lbFlip').onclick = toggleFlip;
+  $('#lbGray').onclick = toggleGray;
+  addEventListener('resize', () => { if (Lightbox.it) Lightbox.fit(); });
+})();
+addEventListener('keydown', e => {
+  if (e.target.matches('input,select,textarea')) {
+    if (e.key === 'Escape') { e.target.blur(); if (Lightbox.it && e.target.closest('#lbSide')) Lightbox.close(); }
+    return;
+  }
+  if (!$('#modal').classList.contains('hidden')) { if (e.key === 'Escape') closeModal(); return; }
+  if (Lightbox.it) {
+    const k = e.key.toLowerCase();
+    if (k === 'escape') Lightbox.close();
+    else if (k === 'arrowleft') Lightbox.step(-1);
+    else if (k === 'arrowright') Lightbox.step(1);
+    else if (k === '0') Lightbox.fit();
+    else if (k === '1') Lightbox.actual();
+    else if (k === 'h') toggleFlip();
+    else if (k === 'g') toggleGray();
+    else if (k === 'f') toggleFav([Lightbox.it]);
+    else if (k === 's') Lightbox.similarBoard();
+    else return;
+    e.preventDefault(); return;
+  }
+  if (e.key === 'Escape') { if (S.sel.size) { S.sel.clear(); renderTiles(true); renderSelbar(); } else if (S.mode) { S.mode = null; refresh(); } }
+});
+
+/* ============ マイタグ・メニュー・書き出し ============ */
+function openModal(...kids) { const b = $('#modalBox'); b.innerHTML = ''; b.append(...kids); $('#modal').classList.remove('hidden'); }
+function closeModal() { $('#modal').classList.add('hidden'); }
+$('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
+function editCustom() {
+  const name = el('input', { type: 'text', placeholder: '例：鎖骨' });
+  const prompt = el('input', { type: 'text', placeholder: '例：a close-up of collarbones（空欄なら手動だけ）' });
+  const list = el('div', { class: 'chips', style: 'margin-top:10px' }, S.custom.map(c => el('span', { class: 'chip', title: c.prompt || '（AIなし）' }, c.label + (c.prompt ? ' 🤖' : ''),
+    el('span', { class: 'x', title: '削除', onclick: async () => {
+      if (!confirm(`マイタグ「${c.label}」を削除しますか？画像に付けたこのタグも外れます。`)) return;
+      S.custom = S.custom.filter(x => x !== c); const id = 'my:' + c.label;
+      for (const it of S.items) if (it.manual.delete(id) | it.rejected.delete(id)) markDirty(it);
+      await saveKV('custom', S.custom); rebuildAfterVocab(); editCustom();
+    } }, '✕'))));
+  openModal(el('h3', null, 'マイタグ'),
+    el('div', { class: 'hint' }, '自分用のタグを作れます。英語の説明を入れると、AIがそのタグも自動で付けます。'),
+    el('label', null, 'タグ名'), name, el('label', null, 'AI用の英語の説明（任意）'), prompt,
+    el('div', { class: 'btns' }, el('button', { onclick: closeModal }, '閉じる'), el('button', { class: 'primary', onclick: async () => {
+      const label = name.value.trim(); if (!label) return name.focus();
+      const ex = S.custom.find(c => c.label === label);
+      if (ex) ex.prompt = prompt.value.trim(); else if (tagByLabel(label)) { toast('同じ名前のタグがすでにあります'); return; } else S.custom.push({ label, prompt: prompt.value.trim() });
+      await saveKV('custom', S.custom); rebuildAfterVocab(); editCustom();
+    } }, '追加・更新')), list);
+  name.focus();
+}
+async function rebuildAfterVocab() {
+  buildTags();
+  if (AI.state === 'ready') { try { TEXT = await AI.embedTexts(PROMPTS); } catch (e) { toast('AI用の説明の読み込みに失敗: ' + e.message); } for (const it of S.items) computeSims(it); }
+  else TEXT = null;
+  recomputeAll(); refresh();
+}
+$('#btnMenu').onclick = () => {
+  openModal(el('h3', null, '設定とデータ'),
+    el('label', null, '背景'), el('div', { class: 'row' },
+      el('button', { class: S.settings.theme === 'dark' ? 'primary' : '', onclick: () => { setTheme('dark'); $('#btnMenu').click(); } }, '暗いグレー'),
+      el('button', { class: S.settings.theme === 'light' ? 'primary' : '', onclick: () => { setTheme('light'); $('#btnMenu').click(); } }, '明るいグレー')),
+    el('label', null, 'タグの控え（このブラウザの外に保存したいとき）'), el('div', { class: 'row' },
+      el('button', { onclick: exportData }, 'タグを書き出す (.json)'),
+      el('button', { onclick: () => $('#importFile').click() }, '読み込む')),
+    el('label', null, 'フォルダ'), el('div', { class: 'row' },
+      el('button', { onclick: () => location.reload() }, '別のフォルダを開く'),
+      S.dirHandle ? el('button', { onclick: async () => { closeModal(); $('#start').classList.remove('hidden'); await loadFromHandle(S.dirHandle); } }, '読み込み直す（追加した画像を反映）') : null),
+    el('label', null, 'マイタグ'), el('button', { onclick: editCustom }, 'マイタグを編集'),
+    el('div', { class: 'hint', style: 'margin-top:12px' }, 'タグ・お気に入り・AI解析の結果は、このPCのこのブラウザに保存されます。元の画像は変更しません。'),
+    el('div', { class: 'btns' }, el('button', { onclick: closeModal }, '閉じる')));
+};
+const importFile = el('input', { type: 'file', accept: '.json,application/json', class: 'hidden', id: 'importFile' });
+document.body.append(importFile);
+importFile.onchange = async () => {
+  const f = importFile.files[0]; if (!f) return;
+  try {
+    const d = JSON.parse(await f.text());
+    for (const c of d.custom || []) if (!S.custom.some(x => x.label === c.label)) S.custom.push(c);
+    await saveKV('custom', S.custom); buildTags();
+    let n = 0;
+    for (const [rel, r] of Object.entries(d.items || {})) {
+      const it = S.byId.get(S.root + '/' + rel); if (!it) continue;
+      for (const t of r.manual || []) if (TAGS.has(t)) it.manual.add(t);
+      for (const t of r.rejected || []) it.rejected.add(t);
+      if (r.fav) it.fav = true;
+      markDirty(it); n++;
+    }
+    await rebuildAfterVocab(); closeModal(); toast(`${n}枚分のタグを読み込みました`);
+  } catch (e) { toast('読み込めませんでした: ' + e.message, 5000); }
+  importFile.value = '';
+};
+function exportData() {
+  const items = {};
+  for (const it of S.items) if (it.manual.size || it.rejected.size || it.fav)
+    items[it.id.slice(S.root.length + 1)] = { manual: [...it.manual], rejected: [...it.rejected], fav: it.fav };
+  const blob = new Blob([JSON.stringify({ app: 'refboard', version: 1, root: S.root, exported: new Date().toISOString(), custom: S.custom, items }, null, 1)], { type: 'application/json' });
+  const a = el('a', { href: URL.createObjectURL(blob), download: `refboard-tags-${S.root}-${new Date().toISOString().slice(0, 10)}.json` });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+function setTheme(t) { S.settings.theme = t; document.documentElement.dataset.theme = t; saveSettings(); }
+
+/* ============ ヘッダー操作 ============ */
+$('#btnSide').onclick = () => {
+  const app = $('#app');
+  if (innerWidth <= 760) app.classList.toggle('sbopen');
+  else { S.settings.sidebar = !S.settings.sidebar; app.classList.toggle('nosb', !S.settings.sidebar); saveSettings(); }
+  setTimeout(layout, 0);
+};
+$('#size').oninput = e => { S.settings.tile = +e.target.value; saveSettings(); layout(); };
+$('#sort').onchange = e => { S.settings.sort = e.target.value; S.mode = null; saveSettings(); $('#main').scrollTop = 0; refresh(); };
+$('#btnShuffle').onclick = () => { S.seed = Math.random() * 1e9 | 0; S.settings.sort = 'random'; $('#sort').value = 'random'; S.mode = null; $('#main').scrollTop = 0; refresh(); };
+$('#q').addEventListener('input', debounce(() => { if ($('#qAI').checked) return; S.F.text = $('#q').value.trim(); refresh(); }, 200));
+$('#q').addEventListener('keydown', async e => {
+  if (e.key !== 'Enter' || !$('#qAI').checked) return;
+  const q = $('#q').value.trim(); if (!q) { S.mode = null; refresh(); return; }
+  if (AI.state !== 'ready') { toast('AI検索は、AIの準備ができてから使えます'); return; }
+  if (/[^\x00-\x7f]/.test(q)) toast('AI検索は英語のほうが正確です（例：girl in the rain, backlit）', 4000);
+  try { const [emb] = await AI.embedTexts([q]); S.mode = { type: 'search', query: q, emb }; S.F.text = ''; $('#main').scrollTop = 0; refresh(); }
+  catch (err) { toast('検索に失敗: ' + err.message); }
+});
+$('#qAI').onchange = () => { $('#q').placeholder = $('#qAI').checked ? '英語で内容を入力して Enter（例：backlit girl）' : 'ファイル名・タグで検索'; if (!$('#qAI').checked && S.mode?.type === 'search') { S.mode = null; refresh(); } };
+$('#main').addEventListener('scroll', () => renderTiles(false), { passive: true });
+new ResizeObserver(debounce(() => { if (S.items.length) layout(); }, 100)).observe($('#main'));
+
+/* ============ 起動 ============ */
+$('#btnOpen').onclick = async () => {
+  // 他のページの中に埋め込まれて開かれた場合はフォルダ選択画面が使えないので、ファイル選択で読み込む
+  let framed = false; try { framed = window.top !== window; } catch (e) { framed = true; }
+  if (!window.showDirectoryPicker || framed) { $('#dirInput').click(); return; }
+  try { const h = await showDirectoryPicker({ id: 'refboard', mode: 'read' }); await loadFromHandle(h); }
+  catch (e) {
+    if (e.name === 'SecurityError') { $('#dirInput').click(); return; }
+    if (e.name !== 'AbortError') { $('#scanMsg').textContent = '開けませんでした: ' + e.message; console.error(e); }
+  }
+};
+$('#dirInput').onchange = e => loadFromFiles(e.target.files);
+(async () => {
+  try { await DB.open(); }
+  catch (e) { $('#scanMsg').textContent = 'このブラウザでは保存領域が使えません: ' + e.message; return; }
+  const st = await DB.get('kv', 'settings'); if (st) Object.assign(S.settings, st);
+  S.custom = (await DB.get('kv', 'custom')) || [];
+  setTheme(S.settings.theme);
+  $('#size').value = S.settings.tile; $('#sort').value = S.settings.sort;
+  $('#app').classList.toggle('nosb', !S.settings.sidebar);
+  if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
+  let last = null; try { last = await DB.get('kv', 'lastDir'); } catch (e) {}
+  if (last && last.queryPermission) {
+    const b = $('#btnReopen'); b.textContent = `前回のフォルダ「${last.name}」を開く`; b.classList.remove('hidden');
+    b.onclick = async () => {
+      try {
+        if ((await last.queryPermission({ mode: 'read' })) !== 'granted' && (await last.requestPermission({ mode: 'read' })) !== 'granted') return;
+        await loadFromHandle(last);
+      } catch (e) { $('#scanMsg').textContent = '開けませんでした。「画像フォルダを選ぶ」から選び直してください。'; console.error(e); }
+    };
+  }
+})();
+</script>
+</body>
+</html>
