@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ストロークドリル</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Shippori+Mincho+B1:wght@700&family=Zen+Kaku+Gothic+New:wght@400;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: drafting desk. A large sheet of paper (canvas) with a narrow instrument panel beside it; guides drawn in non-photo blue. */
+:root{
+  --bg:#E9EEED; --paper:#FBFCFB; --ink:#1B272B; --muted:#5F6F73; --rule:#D3DCDB;
+  --accent:#2F62C8; --guide:#7EA9E3; --accent-soft:rgba(47,98,200,.10);
+  --good:#2C8150; --warn:#B9790B; --bad:#C2443A;
+  --f-display:"Shippori Mincho B1","Hiragino Mincho ProN","Yu Mincho",serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#111719; --paper:#172023; --ink:#E4ECEC; --muted:#8C9DA0; --rule:#29363A;
+  --accent:#86AEF5; --guide:#4F7DBF; --accent-soft:rgba(134,174,245,.12);
+  --good:#5DBB84; --warn:#E2A93B; --bad:#EE7468; color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#111719; --paper:#172023; --ink:#E4ECEC; --muted:#8C9DA0; --rule:#29363A;
+  --accent:#86AEF5; --guide:#4F7DBF; --accent-soft:rgba(134,174,245,.12);
+  --good:#5DBB84; --warn:#E2A93B; --bad:#EE7468; color-scheme:dark;}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.6;
+  display:flex;flex-direction:column;gap:12px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+h1{font-family:var(--f-display);font-size:22px;margin:0;letter-spacing:.04em;line-height:1.2}
+h1 small{font-family:var(--f-body);font-weight:400;font-size:12px;color:var(--muted);letter-spacing:0;margin-left:8px}
+.seg{display:inline-flex;border:1px solid var(--rule);border-radius:8px;overflow:hidden;background:var(--paper)}
+.seg button{font:inherit;border:0;background:transparent;color:var(--ink);padding:6px 14px;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--accent);color:var(--paper);font-weight:700}
+.controls{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-left:auto}
+.controls label{display:inline-flex;align-items:center;gap:6px;color:var(--ink);cursor:pointer;white-space:nowrap}
+input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px}
+select,.btn{font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--rule);border-radius:8px;padding:5px 10px;cursor:pointer}
+.btn:hover,select:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--paper);font-weight:700}
+.btn.danger{color:var(--bad)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:12px}
+.stage{position:relative;background:var(--paper);border:1px solid var(--rule);border-radius:10px;overflow:hidden;touch-action:none;min-height:0}
+canvas{display:block;width:100%;height:100%;touch-action:none;cursor:crosshair;user-select:none;-webkit-user-select:none}
+.hint{position:absolute;left:14px;top:12px;font-size:22px;font-weight:700;color:var(--accent);letter-spacing:.04em;pointer-events:none;background:var(--paper);padding:2px 10px;border-radius:8px;opacity:.95}
+aside{display:flex;flex-direction:column;gap:14px;min-width:0;overflow:auto}
+.eyebrow{font-size:11px;letter-spacing:.12em;color:var(--muted);text-transform:uppercase;margin-bottom:4px}
+.prompt{font-size:15px;font-weight:700;margin:0}
+.scorebox{background:var(--paper);border:1px solid var(--rule);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.big{display:flex;align-items:baseline;gap:8px}
+.big b{font-family:var(--f-mono);font-size:44px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums}
+.big span{color:var(--muted);font-size:12px}
+.bar{display:grid;grid-template-columns:7.6em 1fr 2.6em;align-items:center;gap:8px;font-size:12px}
+.track{height:6px;border-radius:3px;background:var(--rule);overflow:hidden}
+.fill{height:100%;width:0;background:var(--accent);transition:width .25s}
+.num{font-family:var(--f-mono);text-align:right;font-variant-numeric:tabular-nums}
+.raw{font-family:var(--f-mono);font-size:11px;color:var(--muted);line-height:1.7;margin:0;white-space:pre-wrap}
+.tip:empty{display:none}
+.tip{font-size:13px;margin:0;padding:8px 10px;border-radius:6px;background:var(--accent-soft)}
+.dots{display:flex;flex-wrap:wrap;gap:3px}
+.dots i{width:12px;height:12px;border-radius:2px;background:var(--rule)}
+.legend{font-size:12px;color:var(--muted);margin:0}
+.good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.modal{position:fixed;inset:0;background:rgba(10,16,18,.45);display:flex;align-items:flex-start;justify-content:center;overflow:auto;z-index:20;
+  padding:max(24px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) 24px max(16px,env(safe-area-inset-left,0px))}
+.sheet{background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-radius:12px;width:min(640px,100%);padding:20px;display:flex;flex-direction:column;gap:16px}
+.sheet h2{font-family:var(--f-display);font-size:20px;margin:0;text-wrap:balance}
+.sheet h3{font-size:13px;margin:0 0 6px;color:var(--muted);font-weight:700}
+.row{display:flex;flex-wrap:wrap;gap:16px}
+.row>div{flex:1 1 240px;min-width:0}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stat{border:1px solid var(--rule);border-radius:8px;padding:8px 10px}
+.stat b{display:block;font-family:var(--f-mono);font-size:22px;font-variant-numeric:tabular-nums}
+.stat span{font-size:11px;color:var(--muted)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+td,th{border-bottom:1px solid var(--rule);padding:6px 8px;text-align:center}
+th{font-weight:700;color:var(--muted);font-size:12px}
+td.num{font-variant-numeric:tabular-nums}
+svg text{font-family:var(--f-body)}
+.actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
+.note{font-size:12px;color:var(--muted);margin:0}
+@media (max-width:820px){
+  html,body{height:auto}
+  main{grid-template-columns:1fr;grid-template-rows:minmax(380px,64vh) auto}
+  .controls{margin-left:0}
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (prefers-reduced-motion: reduce){.fill{transition:none}}
+</style>
+</head>
+<body>
+
+
+<header>
+  <h1>ストロークドリル</h1>
+  <div class="seg" role="group" aria-label="モード">
+    <button id="mLine" type="button" aria-pressed="true">直線</button>
+    <button id="mCircle" type="button" aria-pressed="false">正円</button>
+    <button id="mP1" type="button" aria-pressed="false">1点透視</button>
+    <button id="mP2" type="button" aria-pressed="false">2点透視</button>
+  </div>
+  <div class="controls">
+    <label for="roundLen"><span id="lenLbl">本数</span>
+      <select id="roundLen"><option value="10">10</option><option value="20" selected>20</option><option value="40">40</option></select>
+    </label>
+    <label for="optAdaptive"><input id="optAdaptive" type="checkbox" checked>弱点強化</label>
+    <label for="optAuto"><input id="optAuto" type="checkbox" checked>自動送り</label>
+    <label for="optPen"><input id="optPen" type="checkbox">指タッチを無視</label>
+    <button id="btnHistory" class="btn" type="button">記録</button>
+  </div>
+</header>
+
+<main>
+  <div class="stage" id="stage">
+    <canvas id="cv" aria-label="描画エリア"></canvas>
+    <div class="hint" id="hint"></div>
+  </div>
+  <aside>
+    <p class="prompt" id="prompt" hidden></p>
+    <div class="scorebox">
+      <div class="eyebrow" style="margin:0">スコア</div>
+      <div class="big"><b id="score">--</b><span>/ 100</span></div>
+      <div class="bar"><span id="l0">直線度</span><div class="track"><div class="fill" id="f0"></div></div><span class="num" id="n0">--</span></div>
+      <div class="bar"><span id="l1">補助線とのズレ</span><div class="track"><div class="fill" id="f1"></div></div><span class="num" id="n1">--</span></div>
+      <div class="bar"><span id="l2">安定性</span><div class="track"><div class="fill" id="f2"></div></div><span class="num" id="n2">--</span></div>
+      <p class="raw" id="raw"></p>
+      <p class="tip" id="tip"></p>
+    </div>
+    <div>
+      <div class="eyebrow">ラウンド</div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px">
+        <b class="num" id="prog" style="font-size:16px">0 / 20</b>
+        <span class="legend">平均 <b class="num" id="ravg">--</b></span>
+      </div>
+      <div class="dots" id="dots"></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" id="btnRestart" type="button">リセット</button>
+      <button class="btn" id="btnSkip" type="button">スキップ</button>
+      <button class="btn" id="btnUndo" type="button" hidden>1本戻す</button>
+      <button class="btn primary" id="btnCheck" type="button" hidden>答え合わせ</button>
+    </div>
+  </aside>
+</main>
+
+<div class="modal" id="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="modalTitle" id="modalBody"></div>
+</div>
+
+<script>
+(()=>{
+const KEY='stroke-drill.v1';
+const DEFAULTS={mode:'line',roundLen:20,roundLenBox:5,guide:true,adaptive:true,auto:true,penOnly:false};
+/* 32 directions, 11.25° apart. Bin angle is in screen space (0 = right, clockwise); labels use the usual convention (0° = right, 90° = up). */
+const LINE_DIRS=32,LINE_STEP=360/LINE_DIRS;
+const LINE_BINS=Array.from({length:LINE_DIRS},(_,i)=>String(i));
+const ARROWS=['→','↘','↓','↙','←','↖','↑','↗'];
+function lineDeg(bin){return (360-Number(bin)*LINE_STEP)%360;}
+function lineLabel(bin){const a=Number(bin)*LINE_STEP;return `${ARROWS[Math.round(a/45)%8]} ${Math.round(lineDeg(bin)*100)/100}°`;}
+const CIRCLE_BINS=['S-cw','S-ccw','M-cw','M-ccw','L-cw','L-ccw'];
+const SIZE_LABEL={S:'小',M:'中',L:'大'};
+const SECT=32;
+/* perspective modes p1 / p2: finish a box in 1- or 2-point perspective; bins = where the box sits against eye level */
+const BOX_BINS=['below','cross','above'];
+const BOX_LABEL={'1p':'1点透視','2p':'2点透視',below:'見下ろし',cross:'目線の高さ',above:'見上げ'};
+const BINS={line:LINE_BINS,circle:CIRCLE_BINS,p1:BOX_BINS,p2:BOX_BINS};
+const MODES={line:{name:'直線',labels:['直線度','補助線とのズレ','安定性']},circle:{name:'正円',labels:['真円度','補助線とのズレ','安定性']},
+  p1:{name:'1点透視',labels:['直線度','消失点への角度','端点の位置']},p2:{name:'2点透視',labels:['直線度','消失点への角度','端点の位置']}};
+function dirLabel(bin,n){const a=Number(bin)*360/n;return `${ARROWS[Math.round(a/45)%8]} ${Math.round(((360-a)%360)*100)/100}°`;}
+const isBox=()=>set.mode==='p1'||set.mode==='p2';
+const roundLen=()=>isBox()?set.roundLenBox:set.roundLen;
+
+function load(){
+  try{const s=JSON.parse(localStorage.getItem(KEY));
+    if(s&&s.settings){s.settings=Object.assign({},DEFAULTS,s.settings);s.bins=s.bins||{line:{},circle:{}};s.history=s.history||[];if(s.v!==2){s.bins.line={};s.v=2;}return s;}}catch(e){}
+  return {v:2,settings:{...DEFAULTS},bins:{line:{},circle:{}},history:[]};
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}}
+let store=load();
+const S={phase:'ready',problem:null,stroke:null,strokes:[],last:null,results:[],timer:null,rect:null};
+const set=store.settings;
+
+const $=id=>document.getElementById(id);
+const cv=$('cv'),ctx=cv.getContext('2d'),stage=$('stage');
+let W=0,H=0,dpr=1,C={};
+
+function readColors(){
+  const cs=getComputedStyle(document.documentElement);
+  ['paper','ink','muted','rule','accent','guide','good','warn','bad'].forEach(k=>C[k]=cs.getPropertyValue('--'+k).trim());
+}
+function resize(){
+  const r=stage.getBoundingClientRect();
+  dpr=window.devicePixelRatio||1;W=Math.max(1,r.width);H=Math.max(1,r.height);
+  cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+  if(S.phase!=='drawing'){ if((S.phase==='ready'&&!S.strokes.length)||!S.problem) newProblem(); else redraw(); }
+}
+
+/* ---------- geometry helpers ---------- */
+const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
+const rand=(a,b)=>a+Math.random()*(b-a);
+const wrapPi=a=>{while(a>Math.PI)a-=2*Math.PI;while(a<-Math.PI)a+=2*Math.PI;return a;};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function resample(pts,step){
+  const out=[{x:pts[0].x,y:pts[0].y}];let prev={x:pts[0].x,y:pts[0].y},acc=0;
+  for(let i=1;i<pts.length;i++){
+    const p=pts[i];let d=Math.hypot(p.x-prev.x,p.y-prev.y);
+    while(acc+d>=step&&d>0){const t=(step-acc)/d;const q={x:prev.x+(p.x-prev.x)*t,y:prev.y+(p.y-prev.y)*t};out.push(q);prev=q;d=Math.hypot(p.x-prev.x,p.y-prev.y);acc=0;}
+    acc+=d;prev={x:p.x,y:p.y};
+  }
+  const l=pts[pts.length-1];if(dist(out[out.length-1],l)>0.01)out.push({x:l.x,y:l.y});
+  return out;
+}
+function pathLen(pts){let s=0;for(let i=1;i<pts.length;i++)s+=dist(pts[i],pts[i-1]);return s;}
+function meanStd(a){const m=a.reduce((x,y)=>x+y,0)/a.length;const v=a.reduce((x,y)=>x+(y-m)*(y-m),0)/a.length;return [m,Math.sqrt(v)];}
+/* speed variation: arc length sampled every 8 ms, first/last 15% of time trimmed */
+function speedCV(pts){
+  const t0=pts[0].t,T=pts[pts.length-1].t-t0;if(!(T>=80))return null;
+  const cum=[0];for(let i=1;i<pts.length;i++)cum.push(cum[i-1]+dist(pts[i],pts[i-1]));
+  const step=8,samples=[];let j=0;
+  for(let tt=0;tt<=T;tt+=step){
+    const at=t0+tt;while(j<pts.length-2&&pts[j+1].t<at)j++;
+    const a=pts[j],b=pts[j+1]||a;const span=b.t-a.t;const f=span>0?clamp((at-a.t)/span,0,1):0;
+    samples.push(cum[j]+(cum[Math.min(j+1,cum.length-1)]-cum[j])*f);
+  }
+  const v=[];for(let i=1;i<samples.length;i++)v.push((samples[i]-samples[i-1])/step);
+  const a=Math.floor(v.length*0.15),b=Math.ceil(v.length*0.85);const mid=v.slice(a,b);
+  if(mid.length<4)return null;const [m,s]=meanStd(mid);return m>0?s/m:null;
+}
+function pressureCV(pts,type){
+  if(type!=='pen')return null;
+  const p=pts.map(q=>q.p);const a=Math.floor(p.length*0.15),b=Math.ceil(p.length*0.85);const mid=p.slice(a,b).filter(x=>x>0);
+  if(mid.length<6)return null;const [m,s]=meanStd(mid);if(s===0&&m===0.5)return null;return m>0?s/m:null;
+}
+const ex=(x,k)=>100*Math.exp(-x/k);
+function smoothScore(sp,pr){const sv=sp==null?70:ex(sp,0.6);return pr==null?sv:0.6*sv+0.4*ex(pr,0.3);}
+
+/* ---------- problem generation ---------- */
+function binStats(mode){return store.bins[mode]||(store.bins[mode]={});}
+function pickBin(mode){
+  const bins=BINS[mode];
+  if(!set.adaptive)return bins[Math.floor(Math.random()*bins.length)];
+  const st=binStats(mode);
+  const w=bins.map(b=>{const e=st[b]?st[b].ema:50;return 12+Math.max(0,100-e);});
+  let r=Math.random()*w.reduce((a,b)=>a+b,0);
+  for(let i=0;i<bins.length;i++){r-=w[i];if(r<=0)return bins[i];}
+  return bins[bins.length-1];
+}
+function margin(){return Math.max(28,Math.min(W,H)*0.07);}
+function genLine(bin){
+  const m=margin(),th=(Number(bin)*LINE_STEP+rand(-3,3))*Math.PI/180,c=Math.cos(th),s=Math.sin(th);
+  const maxL=Math.min(Math.abs(c)>1e-6?(W-2*m)/Math.abs(c):1e9,Math.abs(s)>1e-6?(H-2*m)/Math.abs(s):1e9);
+  const L=maxL*rand(0.35,0.9),dx=L*c,dy=L*s;
+  const A={x:rand(m+Math.max(0,-dx),W-m-Math.max(0,dx)),y:rand(m+Math.max(0,-dy),H-m-Math.max(0,dy))};
+  return {type:'line',bin,A,B:{x:A.x+dx,y:A.y+dy},L};
+}
+function genCircle(bin){
+  const m=margin(),half=Math.min(W,H)/2-m,size=bin[0],dir=bin.endsWith('ccw')?-1:1;
+  const range={S:[0.22,0.34],M:[0.42,0.6],L:[0.7,0.95]}[size];
+  const R=Math.max(24,half*rand(range[0],range[1]));
+  const Cc={x:rand(m+R,Math.max(m+R,W-m-R)),y:rand(m+R,Math.max(m+R,H-m-R))};
+  const phi=rand(0,Math.PI*2);
+  return {type:'circle',bin,C:Cc,R,dir,phi,S:{x:Cc.x+R*Math.cos(phi),y:Cc.y+R*Math.sin(phi)}};
+}
+/* Liang–Barsky: the part of segment p→q that lies on the sheet, or null */
+function clipSeg(p,q){
+  let t0=0,t1=1;const dx=q.x-p.x,dy=q.y-p.y;
+  const f=(pp,qq)=>{if(pp===0)return qq>=0;const r=qq/pp;if(pp<0){if(r>t1)return false;if(r>t0)t0=r;}else{if(r<t0)return false;if(r<t1)t1=r;}return true;};
+  if(f(-dx,p.x)&&f(dx,W-p.x)&&f(-dy,p.y)&&f(dy,H-p.y)&&t1>t0)return [{x:p.x+dx*t0,y:p.y+dy*t0},{x:p.x+dx*t1,y:p.y+dy*t1}];
+  return null;
+}
+/* Box: a real 3D box seen by a pinhole camera with no pitch, so verticals stay vertical and eye level is horizontal.
+   Corner i: bit0 = x, bit1 = y (up), bit2 = z (depth); 1p = box square to the camera, 2p = box turned about the vertical. */
+const BOX_EDGES=[[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+function genBox(bin){
+  const [p,v]=bin.split('-'),m=margin(),mn=Math.min(W,H);
+  for(let k=0;k<1500;k++){
+    const hs=[rand(.35,.65),rand(.35,.65),rand(.35,.65)];
+    const yaw=p==='1p'?0:(Math.random()<.5?1:-1)*rand(22,68)*Math.PI/180;
+    const bz=rand(2.8,5.5),bx=bz*Math.tan(rand(-.22,.22));   // farther = gentler perspective, less wide-angle distortion
+    const by=v==='below'?-hs[1]-rand(.1,.7):v==='above'?hs[1]+rand(.1,.7):rand(-.6,.6)*hs[1];
+    const co=Math.cos(yaw),si=Math.sin(yaw);
+    const W3=(lx,ly,lz)=>({x:bx+lx*co+lz*si,y:by+ly,z:bz-lx*si+lz*co});
+    const c3=[];for(let i=0;i<8;i++)c3.push(W3(i&1?hs[0]:-hs[0],i&2?hs[1]:-hs[1],i&4?hs[2]:-hs[2]));
+    if(c3.some(q=>q.z<0.6))continue;
+    const uv=c3.map(q=>({x:q.x/q.z,y:-q.y/q.z}));
+    const u0=Math.min(...uv.map(q=>q.x)),u1=Math.max(...uv.map(q=>q.x)),v0=Math.min(...uv.map(q=>q.y)),v1=Math.max(...uv.map(q=>q.y));
+    const bw=u1-u0,bh=v1-v0;
+    const sc=Math.min(mn*rand(.4,.58)/Math.max(bw,bh),(W-2*m)/bw,(H-2*m)/bh);
+    const txa=m-sc*u0,txb=W-m-sc*u1,tya=m-sc*v0,tyb=H-m-sc*v1;
+    if(txa>txb||tya>tyb)continue;
+    const tx=rand(txa,txb),ty=rand(tya,tyb),h=ty;   // eye level is v = 0
+    if(h<m*0.6||h>H-m*0.6)continue;
+    const pts=uv.map(q=>({x:tx+sc*q.x,y:ty+sc*q.y}));
+    const vps=[];
+    if(p==='2p')vps.push({x:tx+sc*(co/(-si)),y:h,ax:0});
+    vps.push({x:tx+sc*(si/co),y:h,ax:2});
+    if(p==='1p'&&(vps[0].x<-0.6*W||vps[0].x>1.6*W))continue;
+    // back-face culling: a face is seen when its outward normal points toward the camera
+    const vis={};
+    for(const ax of [0,1,2])for(const sg of [-1,1]){
+      const l=[0,0,0];l[ax]=sg;const n=W3(l[0],l[1],l[2]);n.x-=bx;n.y-=by;n.z-=bz;
+      const cc=W3(l[0]*hs[0],l[1]*hs[1],l[2]*hs[2]);vis[ax+':'+sg]=cc.x*n.x+cc.y*n.y+cc.z*n.z<0;
+    }
+    const edges=BOX_EDGES.map(([i,j])=>{
+      const ax=[0,1,2].find(a=>((i^j)>>a)&1);
+      const hidden=[0,1,2].filter(a=>a!==ax).every(a=>!vis[a+':'+(((i>>a)&1)?1:-1)]);
+      return {i,j,a:pts[i],b:pts[j],ax,hidden,vp:ax===1?null:(vps.find(q=>q.ax===ax)||null),z:(c3[i].z+c3[j].z)/2};
+    });
+    let given;
+    if(p==='2p'){
+      const front=edges.filter(e=>e.ax===1).sort((a,b)=>a.z-b.z)[0],foot=front.i;  // front.i is its bottom corner
+      given=edges.filter(e=>e===front||(e.ax!==1&&(e.i===foot||e.j===foot)));
+    }else{
+      const seen=edges.filter(e=>e.ax===2&&!e.hidden);if(!seen.length)continue;
+      given=edges.filter(e=>e.i<4&&e.j<4).concat([seen[Math.floor(Math.random()*seen.length)]]);
+    }
+    const expected=edges.filter(e=>!given.includes(e));
+    if(expected.some(e=>dist(e.a,e.b)<14))continue;
+    return {type:'box',bin,p,v,h,vps,pts,edges,given,expected,size:sc*Math.max(bw,bh)};
+  }
+  return null;
+}
+const GEN={line:genLine,circle:genCircle,p1:b=>genBox('1p-'+b),p2:b=>genBox('2p-'+b)};
+function newProblem(){
+  clearTimeout(S.timer);
+  const b=pickBin(set.mode);
+  S.problem=GEN[set.mode](b);
+  S.phase='ready';S.last=null;S.stroke=null;S.strokes=[];
+  $('btnCheck').textContent='答え合わせ';
+  updatePrompt();redraw();
+}
+function updatePrompt(){
+  const box=isBox();$('btnUndo').hidden=!box;$('btnCheck').hidden=!box;
+  MODES[set.mode].labels.forEach((t,i)=>$('l'+i).textContent=t);
+  const P=S.problem;if(!P){$('prompt').textContent='';$('hint').textContent='画面が小さすぎます';return;}
+  if(P.type==='line'){$('prompt').textContent=`直線 ${lineLabel(P.bin)}`;$('hint').textContent='● → ○';}
+  else if(P.type==='circle'){const d=P.dir>0?'時計回り':'反時計回り';$('prompt').textContent=`正円 ${SIZE_LABEL[P.bin[0]]}・${d}`;$('hint').textContent=`● から${d}に一周`;}
+  else{$('prompt').textContent=`${BOX_LABEL[P.p]}の箱・${BOX_LABEL[P.v]}`;$('hint').textContent=`残りの辺を描く（隠れ線も）　${S.strokes.length} / ${P.expected.length}`;}
+}
+
+/* ---------- drawing ---------- */
+function clear(){ctx.clearRect(0,0,W,H);}
+function dot(p,r,fill){ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();}
+function ring(p,r,col){ctx.beginPath();ctx.arc(p.x,p.y,r,0,Math.PI*2);ctx.strokeStyle=col;ctx.lineWidth=2;ctx.stroke();}
+function seg(a,b){ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
+const LABEL_FONT='700 11px "Zen Kaku Gothic New", system-ui, sans-serif';
+function drawHorizon(h){
+  ctx.save();ctx.strokeStyle=C.guide;ctx.lineWidth=1;seg({x:0,y:h},{x:W,y:h});
+  ctx.font=LABEL_FONT;ctx.fillStyle=C.guide;ctx.textAlign='right';ctx.fillText('アイレベル',W-10,h-6);ctx.restore();
+}
+/* on the sheet: ring + cross; off the sheet: a pointer on the sheet edge with the distance to the VP */
+function drawVP(V){
+  ctx.save();ctx.strokeStyle=C.accent;ctx.fillStyle=C.accent;ctx.lineWidth=1.5;ctx.font=LABEL_FONT;
+  if(V.x>=6&&V.x<=W-6){
+    ring(V,6,C.accent);seg({x:V.x-11,y:V.y},{x:V.x+11,y:V.y});seg({x:V.x,y:V.y-11},{x:V.x,y:V.y+11});
+    ctx.textAlign='center';ctx.fillText('VP',V.x,V.y+24);
+  }else{
+    const left=V.x<0,x=left?3:W-3,d=left?1:-1;
+    ctx.beginPath();ctx.moveTo(x,V.y);ctx.lineTo(x+d*12,V.y-8);ctx.lineTo(x+d*12,V.y+8);ctx.closePath();ctx.fill();
+    ctx.textAlign=left?'left':'right';ctx.fillText(`VP 画面外 ${Math.round(left?-V.x:V.x-W)}px`,x+d*16,V.y+20);
+  }
+  ctx.restore();
+}
+function drawProblem(P,showGuide){
+  ctx.save();ctx.lineCap='round';
+  if(P.type==='box'){
+    drawHorizon(P.h);P.vps.forEach(drawVP);
+    ctx.strokeStyle=C.accent;ctx.lineWidth=2.5;P.given.forEach(e=>seg(e.a,e.b));
+  }else if(P.type==='line'){
+    if(showGuide){ctx.setLineDash([6,8]);ctx.strokeStyle=C.guide;ctx.lineWidth=1.25;ctx.beginPath();ctx.moveTo(P.A.x,P.A.y);ctx.lineTo(P.B.x,P.B.y);ctx.stroke();ctx.setLineDash([]);}
+    dot(P.A,7.5,C.accent);ring(P.B,10,C.accent);
+    // arrowhead a little way along the guide from the start point, showing the drawing direction
+    {const ux=(P.B.x-P.A.x)/P.L,uy=(P.B.y-P.A.y)/P.L,k=Math.min(34,P.L*0.25),tx=P.A.x+ux*k,ty=P.A.y+uy*k;
+     ctx.beginPath();ctx.moveTo(tx+ux*9,ty+uy*9);ctx.lineTo(tx-uy*6,ty+ux*6);ctx.lineTo(tx+uy*6,ty-ux*6);ctx.closePath();ctx.fillStyle=C.accent;ctx.fill();}
+  }else{
+    if(showGuide){ctx.setLineDash([6,8]);ctx.strokeStyle=C.guide;ctx.lineWidth=1.25;ctx.beginPath();ctx.arc(P.C.x,P.C.y,P.R,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
+    ctx.strokeStyle=C.accent;ctx.lineWidth=1.5;ctx.beginPath();
+    ctx.moveTo(P.C.x-8,P.C.y);ctx.lineTo(P.C.x+8,P.C.y);ctx.moveTo(P.C.x,P.C.y-8);ctx.lineTo(P.C.x,P.C.y+8);ctx.stroke();
+    dot(P.S,5.5,C.accent);
+    // direction arrow just outside the circle, starting at the start point
+    const rr=P.R+16,a0=P.phi,a1=P.phi+P.dir*Math.min(0.6,48/P.R*1.4);
+    ctx.lineWidth=2;ctx.beginPath();ctx.arc(P.C.x,P.C.y,rr,a0,a1,P.dir<0);ctx.stroke();
+    const tip={x:P.C.x+rr*Math.cos(a1),y:P.C.y+rr*Math.sin(a1)};
+    const tang=a1+P.dir*Math.PI/2;const hx=Math.cos(tang),hy=Math.sin(tang);
+    ctx.beginPath();ctx.moveTo(tip.x+hx*7,tip.y+hy*7);
+    ctx.lineTo(tip.x-hy*5,tip.y+hx*5);ctx.lineTo(tip.x+hy*5,tip.y-hx*5);ctx.closePath();ctx.fillStyle=C.accent;ctx.fill();
+  }
+  ctx.restore();
+}
+function penWidth(p,type){return type==='pen'?1.1+p*2.6:2.2;}
+function drawLive(){
+  if(S.problem.type==='box')S.strokes.forEach(drawStroke);
+  if(S.stroke)drawStroke(S.stroke);
+}
+function drawStroke(st){
+  const pts=st.pts;
+  ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.strokeStyle=C.ink;
+  for(let i=1;i<pts.length;i++){ctx.lineWidth=penWidth(pts[i].p,st.type);ctx.beginPath();ctx.moveTo(pts[i-1].x,pts[i-1].y);ctx.lineTo(pts[i].x,pts[i].y);ctx.stroke();}
+  ctx.restore();
+}
+function drawSegment(a,b,type){ctx.save();ctx.lineCap='round';ctx.strokeStyle=C.ink;ctx.lineWidth=penWidth(b.p,type);ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();ctx.restore();}
+function scoreColor(v){return v>=80?C.good:v>=60?C.warn:C.bad;}
+function drawResult(R){
+  const P=S.problem;if(P.type==='box'){drawBoxResult(R);return;}
+  ctx.save();ctx.lineCap='round';
+  ctx.strokeStyle=C.guide;ctx.lineWidth=1.5;ctx.beginPath();
+  if(P.type==='line'){ctx.moveTo(P.A.x,P.A.y);ctx.lineTo(P.B.x,P.B.y);ctx.stroke();}
+  else{
+    // target circle faint and dashed; the best-fit true circle is the reference the colours are measured against
+    ctx.setLineDash([4,6]);ctx.strokeStyle=C.muted;ctx.lineWidth=1;ctx.arc(P.C.x,P.C.y,P.R,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+    if(R.fit){ctx.strokeStyle=C.guide;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(R.fit.x,R.fit.y,R.fit.r,0,Math.PI*2);ctx.stroke();}
+  }
+  ctx.restore();
+  drawProblem(P,false);
+  // stroke coloured by local deviation from the ideal shape
+  ctx.save();ctx.lineCap='round';ctx.lineWidth=3;
+  const rs=R.rs,dv=R.dev;
+  for(let i=1;i<rs.length;i++){const d=Math.abs(dv[i]);ctx.strokeStyle=d<R.th[0]?C.good:d<R.th[1]?C.warn:C.bad;ctx.beginPath();ctx.moveTo(rs[i-1].x,rs[i-1].y);ctx.lineTo(rs[i].x,rs[i].y);ctx.stroke();}
+  // score label near the end of the stroke, kept inside the sheet
+  const e=rs[rs.length-1];const tx=clamp(e.x+14,8,W-70),ty=clamp(e.y-14,30,H-8);
+  ctx.font='600 26px "IBM Plex Mono", ui-monospace, monospace';ctx.fillStyle=scoreColor(R.total);ctx.fillText(String(Math.round(R.total)),tx,ty);
+  ctx.restore();
+}
+function drawBoxResult(R){
+  const P=S.problem,far=6*Math.max(W,H);ctx.save();ctx.lineCap='round';
+  drawHorizon(P.h);
+  // faint rays from each VP along the receding edges
+  ctx.strokeStyle=C.rule;ctx.lineWidth=1;
+  P.expected.concat(P.given).forEach(e=>{if(!e.vp)return;const q=dist(e.a,e.vp)>dist(e.b,e.vp)?e.a:e.b,d=dist(q,e.vp)||1;
+    const k=clipSeg(e.vp,{x:e.vp.x+(q.x-e.vp.x)/d*far,y:e.vp.y+(q.y-e.vp.y)/d*far});if(k)seg(k[0],k[1]);});
+  P.expected.forEach(e=>{ctx.setLineDash(e.hidden?[5,6]:[]);ctx.strokeStyle=C.guide;ctx.lineWidth=1.75;seg(e.a,e.b);});ctx.setLineDash([]);
+  ctx.strokeStyle=C.accent;ctx.lineWidth=2.5;P.given.forEach(e=>seg(e.a,e.b));
+  P.vps.forEach(drawVP);
+  // each stroke in the colour of the edge it was matched to; strokes that matched nothing are grey and dashed
+  R.info.forEach((I,s)=>{const it=R.items.find(x=>x.s===s);
+    ctx.strokeStyle=it?scoreColor(it.score):C.muted;ctx.lineWidth=it?3:2;ctx.setLineDash(it?[]:[3,5]);
+    ctx.beginPath();I.rs.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));ctx.stroke();});
+  ctx.setLineDash([]);
+  const xs=P.pts.map(p=>p.x),ys=P.pts.map(p=>p.y);
+  const tx=clamp(Math.max(...xs)+14,8,W-70),ty=clamp(Math.min(...ys)+20,30,H-8);
+  ctx.font='600 26px "IBM Plex Mono", ui-monospace, monospace';ctx.fillStyle=scoreColor(R.total);ctx.fillText(String(Math.round(R.total)),tx,ty);
+  ctx.restore();
+}
+function redraw(){
+  clear();if(!S.problem)return;
+  if((S.phase==='result'||S.phase==='await')&&S.last){drawResult(S.last);return;}
+  drawProblem(S.problem,true);
+  if(S.phase==='drawing'||S.strokes.length)drawLive();
+}
+
+/* ---------- evaluation ---------- */
+function evalLine(P,pts,type){
+  const rs=resample(pts,2),L=P.L;
+  let mx=0,my=0;rs.forEach(p=>{mx+=p.x;my+=p.y;});mx/=rs.length;my/=rs.length;
+  let sxx=0,syy=0,sxy=0;rs.forEach(p=>{const dx=p.x-mx,dy=p.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
+  const ang=0.5*Math.atan2(2*sxy,sxx-syy),ux=Math.cos(ang),uy=Math.sin(ang);
+  const dev=rs.map(p=>-(p.x-mx)*uy+(p.y-my)*ux);
+  const rms=Math.sqrt(dev.reduce((a,d)=>a+d*d,0)/dev.length),maxDev=Math.max(...dev.map(Math.abs));
+  const st=pts[0],en=pts[pts.length-1],dA=dist(st,P.A),dB=dist(en,P.B);
+  const aerr=Math.abs(wrapPi(Math.atan2(en.y-st.y,en.x-st.x)-Math.atan2(P.B.y-P.A.y,P.B.x-P.A.x)))*180/Math.PI;
+  const cx=en.x-st.x,cy=en.y-st.y,cl=Math.hypot(cx,cy)||1;let sag=0,c=0;
+  for(let i=Math.floor(rs.length*0.3);i<Math.ceil(rs.length*0.7);i++){const p=rs[i];sag+=(cx*(p.y-st.y)-cy*(p.x-st.x))/cl;c++;}
+  sag=c?sag/c:0;
+  const sp=speedCV(pts),pr=pressureCV(pts,type);
+  const shape=ex(rms/L,0.015),acc=ex(((dA+dB)/2)/L,0.06),smooth=smoothScore(sp,pr);
+  let total=0.5*shape+0.3*acc+0.2*smooth;const reversed=aerr>90;if(reversed)total*=0.5;
+  const tips=[];
+  if(reversed)tips.push([999,'逆向き。● から描く']);
+  if(Math.abs(sag)/L>0.003)tips.push([Math.abs(sag)/L/0.003,`${sag>0?'右':'左'}に膨らむ。肩から引く`]);
+  if(aerr>1.5&&!reversed)tips.push([aerr/1.5,`角度 ${aerr.toFixed(1)}° ズレ。素振りしてから`]);
+  if(dB/L>0.02&&dB>dA)tips.push([dB/L/0.02,'終点ズレ。○ を見たまま引く']);
+  if(dA/L>0.02&&dA>=dB)tips.push([dA/L/0.02,'始点ズレ']);
+  if(sp!=null&&sp>0.35)tips.push([sp/0.35,'速さにムラ。迷わず一定速で']);
+  return {total,parts:[shape,acc,smooth],rs,dev,th:[Math.max(1.2,L*0.004),Math.max(2.5,L*0.01)],
+    raw:`ズレ(RMS) ${rms.toFixed(1)}px  最大 ${maxDev.toFixed(1)}px\n始点 ${dA.toFixed(1)}px  終点 ${dB.toFixed(1)}px  角度 ${aerr.toFixed(1)}°\n速度ムラ ${sp==null?'—':(sp*100).toFixed(0)+'%'}  筆圧ムラ ${pr==null?'—':(pr*100).toFixed(0)+'%'}`,
+    tip:pickTip(tips,'Good')};
+}
+function fitCircle(rs){
+  let mx=0,my=0;rs.forEach(p=>{mx+=p.x;my+=p.y;});mx/=rs.length;my/=rs.length;
+  let Suu=0,Svv=0,Suv=0,Su3=0,Sv3=0,Suvv=0,Svuu=0,Szz=0;
+  rs.forEach(p=>{const u=p.x-mx,v=p.y-my,z=u*u+v*v;Suu+=u*u;Svv+=v*v;Suv+=u*v;Su3+=u*z;Sv3+=v*z;Szz+=z;});
+  const n=rs.length;
+  // normal equations for x²+y²+Du+Ev+F=0 (Su=Sv=0 after centering)
+  const a=[[Suu,Suv,0],[Suv,Svv,0],[0,0,n]],b=[-Su3,-Sv3,-Szz];
+  const det=a[0][0]*a[1][1]-a[0][1]*a[1][0];if(Math.abs(det)<1e-9)return null;
+  const D=(b[0]*a[1][1]-a[0][1]*b[1])/det,E=(a[0][0]*b[1]-b[0]*a[1][0])/det,F=b[2]/n;
+  const u0=-D/2,v0=-E/2,r2=u0*u0+v0*v0-F;if(!(r2>0))return null;
+  return {x:u0+mx,y:v0+my,r:Math.sqrt(r2)};
+}
+function evalCircle(P,pts,type){
+  const rs=resample(pts,2),fit=fitCircle(rs);
+  if(!fit)return invalidCircle(rs,'円として認識できません');
+  const dev=rs.map(p=>Math.hypot(p.x-fit.x,p.y-fit.y)-fit.r);
+  const rms=Math.sqrt(dev.reduce((a,d)=>a+d*d,0)/dev.length);
+  let sweep=0;for(let i=1;i<rs.length;i++)sweep+=wrapPi(Math.atan2(rs[i].y-fit.y,rs[i].x-fit.x)-Math.atan2(rs[i-1].y-fit.y,rs[i-1].x-fit.x));
+  const abs=Math.abs(sweep);
+  if(abs<Math.PI)return invalidCircle(rs,'一周描く');
+  const wrongDir=(sweep>0?1:-1)!==P.dir;
+  const gap=dist(rs[0],rs[rs.length-1]);
+  const closeErr=Math.max(Math.abs(abs-2*Math.PI)/(2*Math.PI),abs>=2*Math.PI*0.97?0:gap/(2*Math.PI*fit.r));
+  const cErr=dist(fit,P.C)/P.R,rErr=Math.abs(fit.r-P.R)/P.R,sErr=dist(rs[0],P.S)/P.R;
+  let mx=0,my=0;rs.forEach(p=>{mx+=p.x;my+=p.y;});mx/=rs.length;my/=rs.length;
+  let sxx=0,syy=0,sxy=0;rs.forEach(p=>{const dx=p.x-mx,dy=p.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
+  const h=(sxx+syy)/2,q=Math.sqrt(((sxx-syy)/2)**2+sxy*sxy),ratio=Math.sqrt((h+q)/Math.max(1e-9,h-q));
+  let maj=(0.5*Math.atan2(2*sxy,sxx-syy)*180/Math.PI+180)%180;
+  const majName=['横長','右下がり楕円','縦長','右上がり楕円'][Math.round(maj/45)%4];
+  const sp=speedCV(pts),pr=pressureCV(pts,type);
+  const shape=ex(rms/fit.r,0.03);
+  const acc=0.6*ex((cErr+rErr+sErr*0.5)/2.5,0.05)+0.4*ex(closeErr,0.05);
+  const smooth=smoothScore(sp,pr);
+  let total=0.5*shape+0.3*acc+0.2*smooth;if(wrongDir)total*=0.6;
+  const tips=[];
+  if(wrongDir)tips.push([999,`回転が逆。${P.dir>0?'時計回り':'反時計回り'}で`]);
+  if(ratio>1.04)tips.push([(ratio-1)/0.04,`${majName}（${ratio.toFixed(2)}）。肩から回す`]);
+  if(closeErr>0.05)tips.push([closeErr/0.05,abs<2*Math.PI?'閉じ口が開いている':'重なりすぎ。● で止める']);
+  if(rErr>0.05)tips.push([rErr/0.05,fit.r<P.R?'小さめ':'大きめ']);
+  if(cErr>0.05)tips.push([cErr/0.05,'中心ズレ']);
+  if(sp!=null&&sp>0.35)tips.push([sp/0.35,'速さにムラ。一定のリズムで']);
+  if(rms/fit.r>0.02)tips.push([rms/fit.r/0.02,'ガタつき。少し速く滑らかに']);
+  // radial deviation per 32 sectors around the fitted centre (signed: + = bulges out, - = dents in), as a fraction of r
+  const sec=Array.from({length:SECT},()=>[0,0,0]);
+  rs.forEach((p,i)=>{const a=(Math.atan2(p.y-fit.y,p.x-fit.x)+2*Math.PI)%(2*Math.PI);const k=Math.floor(a/(2*Math.PI)*SECT)%SECT;sec[k][0]+=dev[i]/fit.r;sec[k][1]+=Math.abs(dev[i])/fit.r;sec[k][2]++;});
+  const sectors=sec.map(([sg,ab,n])=>n?{s:sg/n,a:ab/n}:null);
+  return {total,parts:[shape,acc,smooth],rs,dev,fit,sectors,th:[Math.max(1.2,P.R*0.01),Math.max(2.5,P.R*0.025)],
+    raw:`ズレ(RMS) ${rms.toFixed(1)}px (${(rms/fit.r*100).toFixed(1)}%)  縦横比 ${ratio.toFixed(3)}\n中心 ${(cErr*100).toFixed(1)}%  半径 ${((fit.r-P.R)/P.R*100).toFixed(1)}%  周回 ${(abs*180/Math.PI).toFixed(0)}°\n速度ムラ ${sp==null?'—':(sp*100).toFixed(0)+'%'}  筆圧ムラ ${pr==null?'—':(pr*100).toFixed(0)+'%'}`,
+    tip:pickTip(tips,'Good')};
+}
+function invalidCircle(rs,msg){return {total:0,parts:[0,0,0],rs,dev:rs.map(()=>999),th:[1,2],raw:'',tip:msg};}
+function pickTip(tips,ok){if(!tips.length)return ok;tips.sort((a,b)=>b[0]-a[0]);return tips[0][1];}
+
+/* total-least-squares line, oriented along the stroke; p0/p1 = first/last point projected onto it */
+function fitLine(rs){
+  let mx=0,my=0;rs.forEach(p=>{mx+=p.x;my+=p.y;});mx/=rs.length;my/=rs.length;
+  let sxx=0,syy=0,sxy=0;rs.forEach(p=>{const dx=p.x-mx,dy=p.y-my;sxx+=dx*dx;syy+=dy*dy;sxy+=dx*dy;});
+  const ang=0.5*Math.atan2(2*sxy,sxx-syy);let ux=Math.cos(ang),uy=Math.sin(ang);
+  const f=rs[0],l=rs[rs.length-1];if((l.x-f.x)*ux+(l.y-f.y)*uy<0){ux=-ux;uy=-uy;}
+  const dev=rs.map(p=>-(p.x-mx)*uy+(p.y-my)*ux);
+  const rms=Math.sqrt(dev.reduce((a,d)=>a+d*d,0)/dev.length);
+  const pr=p=>{const t=(p.x-mx)*ux+(p.y-my)*uy;return {x:mx+t*ux,y:my+t*uy};};
+  const p0=pr(f),p1=pr(l);
+  return {mx,my,ux,uy,dev,rms,p0,p1,L:dist(p0,p1)};
+}
+/* steepness against eye level, 0–90°: for a receding edge, steeper = converging harder = VP nearer */
+const steep=(dx,dy)=>Math.atan2(Math.abs(dy),Math.abs(dx))*180/Math.PI;
+function evalBox(P,strokes){
+  const info=strokes.map(st=>{const rs=resample(st.pts,2);return {rs,F:fitLine(rs),sp:speedCV(st.pts),pr:pressureCV(st.pts,st.type)};});
+  const E=P.expected,n=info.length,m=E.length,size=P.size,MISS=size*0.35;
+  const cost=(I,e)=>Math.min(dist(I.F.p0,e.a)+dist(I.F.p1,e.b),dist(I.F.p0,e.b)+dist(I.F.p1,e.a))/2;
+  // best assignment of strokes to edges (DP over the set of used strokes); an edge may stay empty at cost MISS
+  const N=1<<n;let f=new Float64Array(N).fill(Infinity);f[0]=0;const ch=[];
+  for(let i=0;i<m;i++){
+    const g=new Float64Array(N).fill(Infinity),c=new Int8Array(N).fill(-2);
+    for(let mask=0;mask<N;mask++){const fm=f[mask];if(fm===Infinity)continue;
+      if(fm+MISS<g[mask]){g[mask]=fm+MISS;c[mask]=-1;}
+      for(let s=0;s<n;s++){if((mask>>s)&1)continue;const k=cost(info[s],E[i]);if(k>=MISS)continue;const nm=mask|(1<<s);if(fm+k<g[nm]){g[nm]=fm+k;c[nm]=s;}}}
+    ch.push(c);f=g;
+  }
+  let mask=0;for(let q=1;q<N;q++)if(f[q]<f[mask])mask=q;
+  const assign=new Array(m);for(let i=m-1;i>=0;i--){const s=ch[i][mask];assign[i]=s;if(s>=0)mask^=1<<s;}
+  const items=[];
+  E.forEach((e,i)=>{const s=assign[i];if(s<0)return;const I=info[s];
+    let d=wrapPi(Math.atan2(I.F.uy,I.F.ux)-Math.atan2(e.b.y-e.a.y,e.b.x-e.a.x));if(d>Math.PI/2)d-=Math.PI;if(d<-Math.PI/2)d+=Math.PI;
+    const aerr=Math.abs(d)*180/Math.PI,pe=cost(I,e);
+    // angle tolerance widens on short edges, where a few px at the ends already swing the angle
+    const sAng=ex(aerr,4*Math.max(1,150/Math.max(1,dist(e.a,e.b)))),sPos=ex(pe/size,0.06),sLine=0.6*ex(I.F.rms/Math.max(20,I.F.L),0.015)+0.4*smoothScore(I.sp,I.pr);
+    let bend=null;   // receding: steeper(+)/shallower(-) than correct; vertical: top leans right(+)/left(-); 1p horizontal: right end up(+)
+    const gx=I.F.ux,gy=I.F.uy,tx=e.b.x-e.a.x,ty=e.b.y-e.a.y;
+    if(e.vp)bend=steep(gx,gy)-steep(tx,ty);
+    else if(e.ax===1){const up=gy>0?-1:1;bend=Math.atan2(gx*up,-gy*up)*180/Math.PI;}
+    else{const r=gx<0?-1:1;bend=Math.atan2(-gy*r,gx*r)*180/Math.PI;}
+    items.push({e,s,aerr,pe,bend,sAng,sPos,sLine,score:0.45*sAng+0.35*sPos+0.2*sLine});
+  });
+  const miss=m-items.length,extra=n-items.length,avg=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+  const total=items.reduce((a,it)=>a+it.score,0)/m*Math.pow(0.92,extra);
+  const parts=[avg(items.map(it=>it.sLine)),avg(items.map(it=>it.sAng)),avg(items.map(it=>it.sPos))];
+  const tips=[];
+  if(miss)tips.push([900,`${miss} 本足りない（隠れ線も描く）`]);
+  if(extra)tips.push([800,`どの辺にも合わない線が ${extra} 本`]);
+  const vpName=vp=>P.vps.length<2?'消失点':(vp.x<P.vps.find(q=>q!==vp).x?'左の消失点':'右の消失点');
+  P.vps.forEach(vp=>{const g=items.filter(it=>it.e.vp===vp);if(g.length<2)return;const b=avg(g.map(it=>it.bend));
+    if(Math.abs(b)>1.2)tips.push([Math.abs(b)/1.2,`${vpName(vp)}へ向かう線が${b>0?'急（消失点が近くなる）':'緩い（消失点が遠くなる）'} ${Math.abs(b).toFixed(1)}°`]);});
+  {const g=items.filter(it=>it.e.ax===1);const b=avg(g.map(it=>it.bend));if(g.length&&Math.abs(b)>1)tips.push([Math.abs(b),`縦線の上が${b>0?'右':'左'}に傾く ${Math.abs(b).toFixed(1)}°`]);}
+  {const g=items.filter(it=>!it.e.vp&&it.e.ax!==1);const b=avg(g.map(it=>it.bend));if(g.length&&Math.abs(b)>1)tips.push([Math.abs(b),`横線の${b>0?'右':'左'}が上がる ${Math.abs(b).toFixed(1)}°`]);}
+  {const hid=items.filter(it=>it.e.hidden),vis=items.filter(it=>!it.e.hidden);
+   if(hid.length&&vis.length&&avg(hid.map(it=>it.score))<avg(vis.map(it=>it.score))-12)tips.push([1.5,'隠れ線が弱い。裏の線も同じ消失点へ']);}
+  if(parts[2]<60&&items.length)tips.push([(60-parts[2])/20,'角の位置がズレ。手前の辺から順に決める']);
+  return {total,parts,info,items,
+    raw:`辺 ${items.length} / ${m}  余分 ${extra}\n角度ズレ 平均 ${avg(items.map(it=>it.aerr)).toFixed(1)}°  最大 ${items.length?Math.max(...items.map(it=>it.aerr)).toFixed(1):'—'}°\n端点ズレ 平均 ${avg(items.map(it=>it.pe)).toFixed(1)}px（箱 ${Math.round(size)}px）`,
+    tip:pickTip(tips,'Good')};
+}
+
+/* ---------- flow ---------- */
+function finishStroke(){
+  const st=S.stroke;S.stroke=null;
+  const P=S.problem;
+  if(P.type==='box'){   // collect strokes; scoring waits for 答え合わせ
+    if(st&&st.pts.length>=3&&pathLen(st.pts)>=10&&S.strokes.length<P.expected.length+5)S.strokes.push(st);
+    S.phase='ready';updatePrompt();redraw();return;
+  }
+  if(!st||st.pts.length<5||pathLen(st.pts)<15){S.phase='ready';redraw();return;}
+  const R=P.type==='line'?evalLine(P,st.pts,st.type):evalCircle(P,st.pts,st.type);
+  S.last=R;S.results.push({bin:P.bin,total:R.total,parts:R.parts,sectors:R.sectors});
+  if(R.sectors){const ca=store.circleAng||(store.circleAng=Array.from({length:SECT},()=>null));
+    R.sectors.forEach((v,k)=>{if(!v)return;const o=ca[k];ca[k]=o?{s:o.s*0.8+v.s*0.2,a:o.a*0.8+v.a*0.2,n:o.n+1}:{s:v.s,a:v.a,n:1};});}
+  const bs=binStats(set.mode),e=bs[P.bin];
+  bs[P.bin]=e?{ema:e.ema*0.75+R.total*0.25,n:e.n+1}:{ema:R.total,n:1};
+  save();
+  showScore(R);updateRound();
+  $('hint').textContent=P.type==='line'?'青＝お題　色＝ズレ':'青＝近似の真円　点線＝お題　色＝ズレ';
+  S.phase='result';redraw();
+  const done=S.results.length>=roundLen();
+  if(set.auto||done){S.timer=setTimeout(()=>{if(done)finishRound();else newProblem();},done?1100:850);}
+  else{S.phase='await';$('hint').textContent+='　タップで次へ';}
+}
+function checkBox(){
+  const P=S.problem;if(!P||P.type!=='box'||S.phase!=='ready'||!S.strokes.length)return;
+  const R=evalBox(P,S.strokes);
+  S.last=R;S.results.push({bin:P.v,total:R.total,parts:R.parts});
+  const bs=binStats(set.mode),e=bs[P.v];
+  bs[P.v]=e?{ema:e.ema*0.75+R.total*0.25,n:e.n+1}:{ema:R.total,n:1};
+  save();showScore(R);updateRound();
+  $('hint').textContent='青＝正解（点線＝隠れ線）　タップで次へ';$('btnCheck').textContent='次へ';
+  S.phase='await';redraw();
+}
+function next(){if(S.results.length>=roundLen())finishRound();else newProblem();}
+function showScore(R){
+  $('score').textContent=Math.round(R.total);$('score').style.color=scoreColor(R.total);
+  R.parts.forEach((v,i)=>{$('f'+i).style.width=clamp(v,0,100)+'%';$('f'+i).style.background=scoreColor(v);$('n'+i).textContent=Math.round(v);});
+  $('raw').textContent=R.raw;$('tip').textContent=R.tip;
+}
+function updateRound(){
+  const n=S.results.length;$('prog').textContent=`${n} / ${roundLen()}`;
+  $('ravg').textContent=n?Math.round(S.results.reduce((a,r)=>a+r.total,0)/n):'--';
+  const d=$('dots');d.innerHTML='';
+  for(let i=0;i<roundLen();i++){const el=document.createElement('i');if(i<n)el.style.background=scoreColor(S.results[i].total);d.appendChild(el);}
+}
+function resetScore(){$('score').textContent='--';$('score').style.color='';[0,1,2].forEach(i=>{$('f'+i).style.width='0';$('n'+i).textContent='--';});$('raw').textContent='';$('tip').textContent='';}
+function restartRound(){S.results=[];resetScore();updateRound();newProblem();}
+function finishRound(){
+  const rs=S.results,n=rs.length;if(!n){newProblem();return;}
+  const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+  const rec={t:Date.now(),mode:set.mode,n,avg:avg(rs.map(r=>r.total)),parts:[0,1,2].map(i=>avg(rs.map(r=>r.parts[i])))};
+  store.history.push(rec);if(store.history.length>300)store.history=store.history.slice(-300);save();
+  const bins={};rs.forEach(r=>{(bins[r.bin]=bins[r.bin]||[]).push(r.total);});
+  const binAvg={};Object.keys(bins).forEach(k=>binAvg[k]={ema:avg(bins[k]),n:bins[k].length});
+  const prev=store.history.filter(h=>h.mode===set.mode);const last=prev.length>1?prev[prev.length-2]:null;
+  const diff=last?rec.avg-last.avg:null;
+  const name=MODES[set.mode].name,lb=MODES[set.mode].labels;
+  const chart=set.mode==='line'?rose(binAvg):isBox()?btable(binAvg):angMap(roundSectors(rs))+ctable(binAvg);
+  openModal(`
+    <h2 id="modalTitle">${name} 結果</h2>
+    <div class="stats">
+      ${stat(rec.avg,'平均'+(diff==null?'':` (${diff>=0?'+':''}${diff.toFixed(1)})`))}
+      ${stat(rec.parts[0],lb[0])}${stat(rec.parts[1],lb[1])}${stat(rec.parts[2],lb[2])}
+    </div>
+    <div class="row">
+      <div><h3>${isBox()?'目線の高さ別':'方向別'}</h3>${chart}</div>
+      <div><h3>推移</h3>${spark(prev.slice(-30).map(h=>h.avg))}
+        <p class="note" style="margin-top:8px">${weakNote(set.mode)}</p></div>
+    </div>
+    <div class="actions"><button class="btn" type="button" data-act="history">記録</button><button class="btn primary" type="button" data-act="again">もう1ラウンド</button></div>`);
+}
+function roundSectors(rs){
+  const acc=Array.from({length:SECT},()=>[0,0,0]);
+  rs.forEach(r=>(r.sectors||[]).forEach((v,k)=>{if(v){acc[k][0]+=v.s;acc[k][1]+=v.a;acc[k][2]++;}}));
+  return acc.map(([sg,ab,n])=>n?{s:sg/n,a:ab/n,n}:null);
+}
+/* angle map: base circle plus the average outline, exaggerated ×EXAG; ticks coloured by average deviation */
+function angMap(sec){
+  if(!sec||!sec.some(Boolean))return '<p class="note">—</p>';
+  const R0=72,EXAG=8,step=2*Math.PI/SECT;
+  let s=`<svg viewBox="-150 -150 300 300" width="100%" style="max-width:280px;display:block;margin:auto" role="img" aria-label="角度ごとのズレ">`;
+  s+=`<circle cx="0" cy="0" r="${R0}" fill="none" stroke="${C.muted}" stroke-dasharray="3 4"/>`;
+  const pts=[];
+  sec.forEach((v,k)=>{if(v){const a=(k+0.5)*step,r=clamp(R0*(1+v.s*EXAG),R0*0.55,R0*1.45);pts.push(`${(r*Math.cos(a)).toFixed(1)},${(r*Math.sin(a)).toFixed(1)}`);}});
+  if(pts.length>2)s+=`<polygon points="${pts.join(' ')}" fill="${C.accent}" fill-opacity=".10" stroke="${C.accent}" stroke-width="2" stroke-linejoin="round"/>`;
+  sec.forEach((v,k)=>{
+    const a0=k*step+step*0.1,a1=(k+1)*step-step*0.1;
+    const col=v?(v.a<0.01?C.good:v.a<0.025?C.warn:C.bad):C.rule;
+    s+=`<path d="${wedge(0,0,R0*1.5,R0*1.5+9,a0,a1)}" fill="${col}"${v?'':' fill-opacity=".5"'}><title>${Math.round((360-(k+0.5)*360/SECT+360)%360)}°付近：${v?(v.s>=0?'外 +':'内 ')+(v.s*100).toFixed(1)+'%（平均ズレ '+(v.a*100).toFixed(1)+'%）':'未記録'}</title></path>`;
+  });
+  for(let i=0;i<8;i++){const a=i*Math.PI/4,lr=R0*1.5+24;s+=`<text x="${(lr*Math.cos(a)).toFixed(1)}" y="${(lr*Math.sin(a)+3).toFixed(1)}" text-anchor="middle" font-size="9" fill="${C.muted}">${(360-i*45)%360}°</text>`;}
+  s+=`</svg>`;
+  // worst sector, by average absolute deviation
+  let w=-1;sec.forEach((v,k)=>{if(v&&(w<0||v.a>sec[w].a))w=k;});
+  const v=sec[w],deg=Math.round((360-(w+0.5)*360/SECT+360)%360),arrow=ARROWS[Math.round(((w+0.5)*360/SECT)/45)%8];
+  s+=`<p class="note" style="text-align:center">青線＝平均の形（ズレ×${EXAG}）　最大ズレ：<b>${arrow} ${deg}°付近</b>（${v.s>=0?'外に膨らむ':'内にへこむ'} ${(Math.abs(v.s)*100).toFixed(1)}%）</p>`;
+  return s;
+}
+function stat(v,label){return `<div class="stat"><b style="color:${scoreColor(v)}">${Math.round(v)}</b><span>${label}</span></div>`;}
+function weakNote(mode){
+  const st=binStats(mode),keys=Object.keys(st).filter(k=>st[k].n>=3);
+  if(keys.length<3)return '';
+  keys.sort((a,b)=>st[a].ema-st[b].ema);const k=keys[0];
+  const label=mode==='line'?lineLabel(k):(mode==='p1'||mode==='p2')?`${MODES[mode].name}・${BOX_LABEL[k]}`:`${SIZE_LABEL[k[0]]}サイズ・${k.endsWith('ccw')?'反時計回り':'時計回り'}`;
+  return `苦手：<b>${label}</b>（${Math.round(st[k].ema)}）`;
+}
+
+/* ---------- charts ---------- */
+function wedge(cx,cy,r0,r1,a0,a1){
+  const p=(r,a)=>`${(cx+r*Math.cos(a)).toFixed(2)} ${(cy+r*Math.sin(a)).toFixed(2)}`;
+  return `M${p(r0,a0)} L${p(r1,a0)} A${r1} ${r1} 0 0 1 ${p(r1,a1)} L${p(r0,a1)} A${r0} ${r0} 0 0 0 ${p(r0,a0)}Z`;
+}
+function rose(st,n=LINE_DIRS){
+  const bins=Array.from({length:n},(_,i)=>String(i)),step=360/n,per=n/8;
+  const r0=16,span=88;let s=`<svg viewBox="-140 -140 280 280" width="100%" style="max-width:280px;display:block;margin:auto" role="img" aria-label="方向別スコア">`;
+  [50,100].forEach(v=>s+=`<circle cx="0" cy="0" r="${r0+span*v/100}" fill="none" stroke="${C.rule}" stroke-width="1"/>`);
+  {const g=-67.5*Math.PI/180,rl=v=>r0+span*v/100+2;[50,100].forEach(v=>s+=`<text x="${(rl(v)*Math.cos(g)).toFixed(1)}" y="${(rl(v)*Math.sin(g)).toFixed(1)}" font-size="8" fill="${C.muted}">${v}</text>`);}
+  const half=Math.PI/n*0.8;
+  bins.forEach((b,i)=>{
+    const a=i*step*Math.PI/180,a0=a-half,a1=a+half,d=st[b];
+    const tip=`<title>${dirLabel(b,n)}：${d?Math.round(d.ema)+'点（'+d.n+'本）':'未記録'}</title>`;
+    if(d){s+=`<path d="${wedge(0,0,r0,r0+span*clamp(d.ema,0,100)/100,a0,a1)}" fill="${scoreColor(d.ema)}" fill-opacity=".85">${tip}</path>`;}
+    else{s+=`<path d="${wedge(0,0,r0,r0+span,a0,a1)}" fill="none" stroke="${C.rule}" stroke-dasharray="2 3">${tip}</path>`;}
+    if(i%per===0){
+      const lx=(r0+span+20)*Math.cos(a),ly=(r0+span+20)*Math.sin(a);
+      s+=`<text x="${lx.toFixed(1)}" y="${(ly-2).toFixed(1)}" text-anchor="middle" font-size="13" fill="${C.ink}">${ARROWS[i/per]}</text>`;
+      s+=`<text x="${lx.toFixed(1)}" y="${(ly+11).toFixed(1)}" text-anchor="middle" font-size="9" fill="${C.muted}">${Math.round((360-i*step)%360)}°</text>`;
+    }
+  });
+  return s+`</svg>`;
+}
+function ctable(st){
+  const cell=k=>{const d=st[k];return d?`<td class="num" style="color:${scoreColor(d.ema)};font-weight:700">${Math.round(d.ema)}<span style="color:${C.muted};font-weight:400;font-size:11px"> (${d.n})</span></td>`:'<td class="num" style="color:var(--muted)">—</td>';};
+  return `<table><tr><th>サイズ</th><th>時計回り</th><th>反時計回り</th></tr>${['S','M','L'].map(z=>`<tr><th>${SIZE_LABEL[z]}</th>${cell(z+'-cw')}${cell(z+'-ccw')}</tr>`).join('')}</table>`;
+}
+function btable(st){
+  const cell=k=>{const d=st[k];return d?`<td class="num" style="color:${scoreColor(d.ema)};font-weight:700">${Math.round(d.ema)}<span style="color:${C.muted};font-weight:400;font-size:11px"> (${d.n})</span></td>`:'<td class="num" style="color:var(--muted)">—</td>';};
+  return `<table><tr>${BOX_BINS.map(v=>`<th>${BOX_LABEL[v]}</th>`).join('')}</tr><tr>${BOX_BINS.map(cell).join('')}</tr></table>`;
+}
+function spark(vals){
+  const w=280,h=90,pl=24,pr=8,pt=8,pb=14;
+  if(!vals.length)return `<p class="note">—</p>`;
+  const x=i=>pl+(vals.length===1?(w-pl-pr)/2:i*(w-pl-pr)/(vals.length-1)),y=v=>pt+(100-clamp(v,0,100))*(h-pt-pb)/100;
+  let s=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="display:block" role="img" aria-label="スコア推移">`;
+  [0,50,100].forEach(v=>s+=`<line x1="${pl}" x2="${w-pr}" y1="${y(v)}" y2="${y(v)}" stroke="${C.rule}"/><text x="${pl-4}" y="${y(v)+3}" text-anchor="end" font-size="9" fill="${C.muted}">${v}</text>`);
+  const pts=vals.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
+  if(vals.length>1)s+=`<polygon points="${x(0)},${y(0)} ${pts} ${x(vals.length-1)},${y(0)}" fill="${C.accent}" fill-opacity=".12"/><polyline points="${pts}" fill="none" stroke="${C.accent}" stroke-width="2" stroke-linejoin="round"/>`;
+  const lv=vals[vals.length-1];
+  s+=`<circle cx="${x(vals.length-1)}" cy="${y(lv)}" r="3.5" fill="${C.accent}"/><text x="${Math.min(w-pr,x(vals.length-1))}" y="${h-2}" text-anchor="end" font-size="9" fill="${C.muted}">最新 ${Math.round(lv)}</text>`;
+  return s+`</svg>`;
+}
+function showHistory(){
+  const L=store.history.filter(h=>h.mode==='line'),Ci=store.history.filter(h=>h.mode==='circle');
+  const P1=store.history.filter(h=>h.mode==='p1'),P2=store.history.filter(h=>h.mode==='p2');
+  openModal(`
+    <h2 id="modalTitle">記録</h2>
+    <div class="row">
+      <div><h3>直線・方向別</h3>${rose(binStats('line'))}<p class="note">${weakNote('line')}</p></div>
+      <div><h3>直線・推移（${L.length}）</h3>${spark(L.slice(-30).map(h=>h.avg))}</div>
+    </div>
+    <div class="row">
+      <div><h3>正円・角度ごとのズレ</h3>${angMap(store.circleAng)}<h3 style="margin-top:10px">サイズ×回転</h3>${ctable(binStats('circle'))}<p class="note">${weakNote('circle')}</p></div>
+      <div><h3>正円・推移（${Ci.length}）</h3>${spark(Ci.slice(-30).map(h=>h.avg))}</div>
+    </div>
+    <div class="row">
+      <div><h3>1点透視・目線の高さ別</h3>${btable(binStats('p1'))}<p class="note">${weakNote('p1')}</p></div>
+      <div><h3>1点透視・推移（${P1.length}）</h3>${spark(P1.slice(-30).map(h=>h.avg))}</div>
+    </div>
+    <div class="row">
+      <div><h3>2点透視・目線の高さ別</h3>${btable(binStats('p2'))}<p class="note">${weakNote('p2')}</p></div>
+      <div><h3>2点透視・推移（${P2.length}）</h3>${spark(P2.slice(-30).map(h=>h.avg))}</div>
+    </div>
+    <div class="actions"><button class="btn danger" type="button" data-act="reset" id="btnReset">記録を消去</button><button class="btn primary" type="button" data-act="close">閉じる</button></div>`);
+}
+let modalReturn=null;
+function openModal(html){$('modalBody').innerHTML=html;$('modal').hidden=false;const b=$('modalBody').querySelector('.btn.primary');if(b)b.focus();}
+function closeModal(){$('modal').hidden=true;}
+$('modal').addEventListener('click',e=>{
+  if(e.target===$('modal')){closeModal();if(S.results.length>=roundLen())restartRound();return;}
+  const act=e.target.closest('[data-act]')?.dataset.act;if(!act)return;
+  if(act==='again'){closeModal();restartRound();}
+  else if(act==='close'){closeModal();if(S.results.length>=roundLen())restartRound();}
+  else if(act==='history'){showHistory();}
+  else if(act==='reset'){
+    const b=$('btnReset');
+    if(b.dataset.armed){store.bins={line:{},circle:{},p1:{},p2:{}};store.history=[];store.circleAng=null;save();showHistory();}
+    else{b.dataset.armed='1';b.textContent='もう一度押して消去';}
+  }
+});
+document.addEventListener('keydown',e=>{
+  if(!$('modal').hidden){if(e.key==='Escape'){closeModal();if(S.results.length>=roundLen())restartRound();}return;}
+  if(!isBox()||/^(INPUT|SELECT|BUTTON)$/.test(e.target.tagName))return;
+  if(e.key==='Enter'){e.preventDefault();$('btnCheck').click();}
+  else if(e.key==='Backspace'||((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z')){e.preventDefault();$('btnUndo').click();}
+});
+
+/* ---------- input ---------- */
+function ptOf(e){return {x:e.clientX-S.rect.left,y:e.clientY-S.rect.top,t:e.timeStamp,p:e.pressure};}
+cv.addEventListener('pointerdown',e=>{
+  if(e.button>0||!$('modal').hidden)return;
+  if(set.penOnly&&e.pointerType==='touch')return;
+  e.preventDefault();
+  if(S.phase==='await'){next();return;}
+  if(S.phase!=='ready'||S.stroke)return;
+  S.rect=cv.getBoundingClientRect();
+  try{cv.setPointerCapture(e.pointerId);}catch(_){}
+  S.stroke={id:e.pointerId,type:e.pointerType,pts:[ptOf(e)]};S.phase='drawing';redraw();
+});
+cv.addEventListener('pointermove',e=>{
+  const st=S.stroke;if(!st||e.pointerId!==st.id)return;
+  const evs=e.getCoalescedEvents?e.getCoalescedEvents():[e];
+  for(const ev of (evs.length?evs:[e])){const p=ptOf(ev),prev=st.pts[st.pts.length-1];if(p.t<prev.t)p.t=prev.t;st.pts.push(p);drawSegment(prev,p,st.type);}
+});
+const end=e=>{if(S.stroke&&e.pointerId===S.stroke.id)finishStroke();};
+cv.addEventListener('pointerup',end);cv.addEventListener('pointercancel',end);
+cv.addEventListener('contextmenu',e=>e.preventDefault());
+
+/* ---------- controls ---------- */
+const MODE_BTN={line:'mLine',circle:'mCircle',p1:'mP1',p2:'mP2'};
+if(!MODE_BTN[set.mode])set.mode='line';
+function syncMode(){
+  Object.entries(MODE_BTN).forEach(([k,id])=>$(id).setAttribute('aria-pressed',set.mode===k));
+  const opts=isBox()?[3,5,10]:[10,20,40];
+  $('roundLen').innerHTML=opts.map(v=>`<option value="${v}">${v}</option>`).join('');$('roundLen').value=String(roundLen());
+  $('lenLbl').textContent=isBox()?'個数':'本数';
+}
+function setMode(m){set.mode=m;save();syncMode();restartRound();}
+Object.entries(MODE_BTN).forEach(([k,id])=>$(id).onclick=()=>setMode(k));
+$('roundLen').onchange=e=>{if(isBox())set.roundLenBox=Number(e.target.value);else set.roundLen=Number(e.target.value);save();restartRound();};
+[['optAdaptive','adaptive'],['optAuto','auto'],['optPen','penOnly']].forEach(([id,k])=>{
+  const el=$(id);el.checked=!!set[k];el.onchange=()=>{set[k]=el.checked;save();};
+});
+$('btnHistory').onclick=showHistory;
+$('btnRestart').onclick=restartRound;
+$('btnSkip').onclick=()=>{if(S.phase!=='drawing')newProblem();};
+$('btnUndo').onclick=()=>{if(S.phase==='ready'&&S.strokes.length){S.strokes.pop();updatePrompt();redraw();}};
+$('btnCheck').onclick=()=>{if(S.phase==='await')next();else checkBox();};
+
+readColors();
+const themeChanged=()=>{readColors();redraw();};
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',themeChanged);}catch(_){}
+new MutationObserver(themeChanged).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+syncMode();
+new ResizeObserver(resize).observe(stage);
+resize();updateRound();updatePrompt();
+})();
+</script>
+
+</body>
+</html>
