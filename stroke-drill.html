@@ -83,6 +83,8 @@ table{border-collapse:collapse;width:100%;font-size:13px}
 td,th{border-bottom:1px solid var(--rule);padding:6px 8px;text-align:center}
 th{font-weight:700;color:var(--muted);font-size:12px}
 td.num{font-variant-numeric:tabular-nums}
+.tscroll{overflow-x:auto}
+.daytbl td,.daytbl th{white-space:nowrap;padding:6px}
 svg text{font-family:var(--f-body)}
 .actions{display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end}
 .note{font-size:12px;color:var(--muted);margin:0}
@@ -182,8 +184,13 @@ function load(){
     if(s&&s.settings){s.settings=Object.assign({},DEFAULTS,s.settings);s.bins=s.bins||{line:{},circle:{}};s.history=s.history||[];if(s.v!==2){s.bins.line={};s.v=2;}return s;}}catch(e){}
   return {v:2,settings:{...DEFAULTS},bins:{line:{},circle:{}},history:[]};
 }
+/* 日別まとめ：日本時間0時区切り。履歴300件の上限とは別に保存して古い日も残す */
+const dayKey=t=>new Date(t+9*3600e3).toISOString().slice(0,10);
+function addDaily(st,h){const m=st.daily[h.mode]||(st.daily[h.mode]={}),k=dayKey(h.t),d=m[k]||(m[k]={r:0,n:0,s:0,p:[0,0,0]});
+  d.r++;d.n+=h.n;d.s+=h.avg*h.n;h.parts.forEach((v,i)=>d.p[i]+=v*h.n);}
 function save(){try{localStorage.setItem(KEY,JSON.stringify(store));}catch(e){}}
 let store=load();
+if(!store.daily){store.daily={};store.history.forEach(h=>addDaily(store,h));save();}
 const S={phase:'ready',problem:null,stroke:null,strokes:[],last:null,results:[],timer:null,rect:null};
 const set=store.settings;
 
@@ -647,7 +654,7 @@ function finishRound(){
   const rs=S.results,n=rs.length;if(!n){newProblem();return;}
   const avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
   const rec={t:Date.now(),mode:set.mode,n,avg:avg(rs.map(r=>r.total)),parts:[0,1,2].map(i=>avg(rs.map(r=>r.parts[i])))};
-  store.history.push(rec);if(store.history.length>300)store.history=store.history.slice(-300);save();
+  store.history.push(rec);addDaily(store,rec);if(store.history.length>300)store.history=store.history.slice(-300);save();
   const bins={};rs.forEach(r=>{(bins[r.bin]=bins[r.bin]||[]).push(r.total);});
   const binAvg={};Object.keys(bins).forEach(k=>binAvg[k]={ema:avg(bins[k]),n:bins[k].length});
   const prev=store.history.filter(h=>h.mode===set.mode);const last=prev.length>1?prev[prev.length-2]:null;
@@ -747,11 +754,38 @@ function spark(vals){
   s+=`<circle cx="${x(vals.length-1)}" cy="${y(lv)}" r="3.5" fill="${C.accent}"/><text x="${Math.min(w-pr,x(vals.length-1))}" y="${h-2}" text-anchor="end" font-size="9" fill="${C.muted}">最新 ${Math.round(lv)}</text>`;
   return s+`</svg>`;
 }
+const WD='日月火水木金土';
+function fmtDay(k){const d=new Date(k+'T00:00:00Z');return `${d.getUTCMonth()+1}/${d.getUTCDate()}（${WD[d.getUTCDay()]}）`;}
+function dayChart(days){
+  const w=400,h=110,pl=24,pr=8,pt=8,pb=18,span=30,end=Date.parse(dayKey(Date.now())+'T00:00:00Z'),start=end-(span-1)*864e5;
+  const pts=days.map(([k,d])=>[(Date.parse(k+'T00:00:00Z')-start)/864e5,d.s/d.n]).filter(p=>p[0]>=0);
+  if(!pts.length)return `<p class="note">直近30日の記録はまだありません</p>`;
+  const x=i=>pl+i*(w-pl-pr)/(span-1),y=v=>pt+(100-clamp(v,0,100))*(h-pt-pb)/100;
+  let s=`<svg viewBox="0 0 ${w} ${h}" width="100%" style="display:block" role="img" aria-label="日別平均の推移（直近30日）">`;
+  [0,50,100].forEach(v=>s+=`<line x1="${pl}" x2="${w-pr}" y1="${y(v)}" y2="${y(v)}" stroke="${C.rule}"/><text x="${pl-4}" y="${y(v)+3}" text-anchor="end" font-size="9" fill="${C.muted}">${v}</text>`);
+  const lab=(i,a)=>`<text x="${x(i)}" y="${h-4}" text-anchor="${a}" font-size="9" fill="${C.muted}">${fmtDay(new Date(start+i*864e5).toISOString().slice(0,10))}</text>`;
+  s+=lab(0,'start')+lab(span-1,'end');
+  if(pts.length>1)s+=`<polyline points="${pts.map(p=>`${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(' ')}" fill="none" stroke="${C.accent}" stroke-width="2" stroke-linejoin="round"/>`;
+  pts.forEach(p=>s+=`<circle cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="3" fill="${scoreColor(p[1])}"><title>${Math.round(p[1])}</title></circle>`);
+  return s+`</svg>`;
+}
+function dailyHtml(mode){
+  const days=Object.entries(store.daily[mode]||{}).sort((a,b)=>a[0]<b[0]?-1:1);
+  if(!days.length)return `<p class="note">このモードの記録はまだありません</p>`;
+  const lb=MODES[mode].labels,c=v=>`<td class="num" style="color:${scoreColor(v)};font-weight:700">${Math.round(v)}</td>`;
+  const rows=days.map(([k,d],i)=>{const a=d.s/d.n,pv=i?days[i-1][1]:null,df=pv?Math.round(a)-Math.round(pv.s/pv.n):null;
+    return `<tr><th>${fmtDay(k)}</th><td class="num">${d.r}<span style="color:${C.muted};font-size:11px">（${d.n}本）</span></td>${c(a)}${d.p.map(v=>`<td class="num">${Math.round(v/d.n)}</td>`).join('')}<td class="num" style="color:${df==null?C.muted:df>0?C.good:df<0?C.bad:C.muted}">${df==null?'—':(df>0?'+':'')+df}</td></tr>`;}).slice(-14).reverse();
+  return `${dayChart(days)}<div class="tscroll"><table class="daytbl"><tr><th>日付</th><th>回数</th><th>平均</th>${lb.map(l=>`<th>${l}</th>`).join('')}<th>前回比</th></tr>${rows.join('')}</table></div><p class="note">直近14日分（記録のある日）。前回比は1つ前の記録日との差。日付は日本時間0時区切り。</p>`;
+}
+function dailySection(mode){
+  return `<div class="seg" role="group" aria-label="日別のモード" style="margin-bottom:8px">${Object.keys(MODES).map(m=>`<button type="button" data-dm="${m}" aria-pressed="${m===mode}">${MODES[m].name}</button>`).join('')}</div><div id="dailyBody">${dailyHtml(mode)}</div>`;
+}
 function showHistory(){
   const L=store.history.filter(h=>h.mode==='line'),Ci=store.history.filter(h=>h.mode==='circle');
   const P1=store.history.filter(h=>h.mode==='p1'),P2=store.history.filter(h=>h.mode==='p2');
   openModal(`
     <h2 id="modalTitle">記録</h2>
+    <div><h3>日別</h3>${dailySection(store.daily[set.mode]?set.mode:'line')}</div>
     <div class="row">
       <div><h3>直線・方向別</h3>${rose(binStats('line'))}<p class="note">${weakNote('line')}</p></div>
       <div><h3>直線・推移（${L.length}）</h3>${spark(L.slice(-30).map(h=>h.avg))}</div>
@@ -775,13 +809,15 @@ function openModal(html){$('modalBody').innerHTML=html;$('modal').hidden=false;c
 function closeModal(){$('modal').hidden=true;}
 $('modal').addEventListener('click',e=>{
   if(e.target===$('modal')){closeModal();if(S.results.length>=roundLen())restartRound();return;}
+  const dm=e.target.closest('[data-dm]');
+  if(dm){$('modalBody').querySelectorAll('[data-dm]').forEach(b=>b.setAttribute('aria-pressed',b===dm));$('dailyBody').innerHTML=dailyHtml(dm.dataset.dm);return;}
   const act=e.target.closest('[data-act]')?.dataset.act;if(!act)return;
   if(act==='again'){closeModal();restartRound();}
   else if(act==='close'){closeModal();if(S.results.length>=roundLen())restartRound();}
   else if(act==='history'){showHistory();}
   else if(act==='reset'){
     const b=$('btnReset');
-    if(b.dataset.armed){store.bins={line:{},circle:{},p1:{},p2:{}};store.history=[];store.circleAng=null;save();showHistory();}
+    if(b.dataset.armed){store.bins={line:{},circle:{},p1:{},p2:{}};store.history=[];store.daily={};store.circleAng=null;save();showHistory();}
     else{b.dataset.armed='1';b.textContent='もう一度押して消去';}
   }
 });
