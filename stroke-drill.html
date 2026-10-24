@@ -114,6 +114,7 @@ svg text{font-family:var(--f-body)}
     </label>
     <label for="optAdaptive"><input id="optAdaptive" type="checkbox" checked>弱点強化</label>
     <label for="optAuto"><input id="optAuto" type="checkbox" checked>自動送り</label>
+    <label for="optRays" id="raysLbl"><input id="optRays" type="checkbox" checked>補助線</label>
     <label for="optPen"><input id="optPen" type="checkbox">指タッチを無視</label>
     <button id="btnHistory" class="btn" type="button">記録</button>
   </div>
@@ -159,7 +160,7 @@ svg text{font-family:var(--f-body)}
 <script>
 (()=>{
 const KEY='stroke-drill.v1';
-const DEFAULTS={mode:'line',roundLen:20,roundLenBox:5,guide:true,adaptive:true,auto:true,penOnly:false};
+const DEFAULTS={mode:'line',roundLen:20,roundLenBox:5,guide:true,adaptive:true,auto:true,penOnly:false,rays:true};
 /* 32 directions, 11.25° apart. Bin angle is in screen space (0 = right, clockwise); labels use the usual convention (0° = right, 90° = up). */
 const LINE_DIRS=32,LINE_STEP=360/LINE_DIRS;
 const LINE_BINS=Array.from({length:LINE_DIRS},(_,i)=>String(i));
@@ -375,9 +376,21 @@ function drawVP(V){
   }
   ctx.restore();
 }
+/* a fan of faint rays from each VP, evenly spaced across the box (not through its corners), so an off-sheet VP can be aimed at */
+function drawFan(P){
+  const step=44,far=6*Math.max(W,H),cx=P.pts.reduce((t,q)=>t+q.x,0)/P.pts.length;ctx.save();ctx.strokeStyle=C.rule;ctx.lineWidth=1;
+  P.vps.forEach(V=>{
+    const dx=cx-V.x,ax=V.x+(dx<0?-1:1)*Math.max(250,Math.abs(dx)),n=Math.ceil(1.5*H/step);
+    for(let k=-n;k<=n;k++){if(!k)continue;
+      const q={x:ax,y:P.h+k*step},d=dist(q,V)||1;
+      const c=clipSeg(V,{x:V.x+(q.x-V.x)/d*far,y:V.y+(q.y-V.y)/d*far});if(c)seg(c[0],c[1]);}
+  });
+  ctx.restore();
+}
 function drawProblem(P,showGuide){
   ctx.save();ctx.lineCap='round';
   if(P.type==='box'){
+    if(set.rays)drawFan(P);
     drawHorizon(P.h);P.vps.forEach(drawVP);
     ctx.strokeStyle=C.accent;ctx.lineWidth=2.5;P.given.forEach(e=>seg(e.a,e.b));
   }else if(P.type==='line'){
@@ -857,12 +870,13 @@ function syncMode(){
   const opts=isBox()?[3,5,10]:[10,20,40];
   $('roundLen').innerHTML=opts.map(v=>`<option value="${v}">${v}</option>`).join('');$('roundLen').value=String(roundLen());
   $('lenLbl').textContent=isBox()?'個数':'本数';
+  $('raysLbl').hidden=!isBox();
 }
 function setMode(m){set.mode=m;save();syncMode();restartRound();}
 Object.entries(MODE_BTN).forEach(([k,id])=>$(id).onclick=()=>setMode(k));
 $('roundLen').onchange=e=>{if(isBox())set.roundLenBox=Number(e.target.value);else set.roundLen=Number(e.target.value);save();restartRound();};
-[['optAdaptive','adaptive'],['optAuto','auto'],['optPen','penOnly']].forEach(([id,k])=>{
-  const el=$(id);el.checked=!!set[k];el.onchange=()=>{set[k]=el.checked;save();};
+[['optAdaptive','adaptive'],['optAuto','auto'],['optPen','penOnly'],['optRays','rays']].forEach(([id,k])=>{
+  const el=$(id);el.checked=!!set[k];el.onchange=()=>{set[k]=el.checked;save();if(k==='rays')redraw();};
 });
 $('btnHistory').onclick=showHistory;
 $('btnRestart').onclick=restartRound;
