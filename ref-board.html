@@ -66,6 +66,8 @@ header .grow{flex:1}
 .tile .st{position:absolute;right:4px;top:4px;pointer-events:auto;background:rgba(0,0,0,.45);border:none;color:#fff;border-radius:50%;width:26px;height:26px;padding:0;font-size:15px;line-height:26px;opacity:0}
 .tile:hover .st,.tile .st.on{opacity:1}
 .tile .st.on{color:var(--star)}
+.tile .uc{position:absolute;right:34px;top:7px;pointer-events:none;background:rgba(0,0,0,.55);color:#fff;border-radius:10px;padding:0 7px;font-size:11px;line-height:20px}
+.tile .uc:empty{display:none}
 .tile.sel{outline:3px solid var(--accent);outline-offset:-3px}
 .tile.sel::after{content:"✓";position:absolute;left:6px;top:4px;background:var(--accent);color:#fff;border-radius:50%;width:22px;height:22px;text-align:center;line-height:22px;font-size:13px}
 
@@ -118,10 +120,10 @@ header .grow{flex:1}
   <header>
     <button id="btnSide" title="タグ一覧の表示/非表示">☰</button>
     <input id="q" type="search" placeholder="ファイル名・タグで検索">
-    <label class="row" title="画像の内容をAIで検索（英語で入力）"><input type="checkbox" id="qAI"> AI検索(英語)</label>
+    <label class="row" title="画像の内容をAIで検索（英語で入力）"><input type="checkbox" id="qAI" autocomplete="off"> AI検索(英語)</label>
     <select id="sort" title="並び順">
       <option value="new">新しい順</option><option value="old">古い順</option>
-      <option value="name">名前順</option><option value="random">ランダム</option>
+      <option value="name">名前順</option><option value="uses">よく使う順</option><option value="random">ランダム</option>
     </select>
     <button id="btnShuffle" title="ランダムの並びを変える">⟳</button>
     <label class="row" title="サムネイルの大きさ">大きさ <input type="range" id="size" min="120" max="460" step="10"></label>
@@ -450,7 +452,7 @@ const S = {
   settings: { tile: 220, theme: 'dark', sort: 'new', sens: 50, aiAuto: false, collapsed: {}, sidebar: true },
   custom: [],            // マイタグ [{label, prompt}]
   seed: Math.random() * 1e9 | 0,
-  F: { inc: new Map(), exc: new Set(), fav: false, untagged: false, text: '' },
+  F: { inc: new Map(), exc: new Set(), fav: false, used2: false, untagged: false, text: '' },
   mode: null,           // {type:'sim', ref} | {type:'search', query, emb} | {type:'cand', tag}
   sel: new Set(), lastSel: null,
 };
@@ -559,7 +561,7 @@ function newItem(path, size, mtime, src) {
   const parts = path.split('/');
   return {
     id: path, name: parts[parts.length - 1], dirTags: parts.slice(1, -1).map(p => 'dir:' + p),
-    size, mtime, w: 0, h: 0, manual: new Set(), rejected: new Set(), fav: false, emb: null, sims: null,
+    size, mtime, w: 0, h: 0, manual: new Set(), rejected: new Set(), fav: false, uses: 0, emb: null, sims: null,
     ai: new Set(), tags: new Set(), ...src,
   };
 }
@@ -596,7 +598,7 @@ async function finishLoad(items) {
   for (const it of items) {
     const r = saved.get(it.id);
     if (!r) continue;
-    it.manual = new Set(r.manual || []); it.rejected = new Set(r.rejected || []); it.fav = !!r.fav;
+    it.manual = new Set(r.manual || []); it.rejected = new Set(r.rejected || []); it.fav = !!r.fav; it.uses = r.uses || 0;
     if (r.size === it.size && r.mtime === it.mtime) { it.w = r.w || 0; it.h = r.h || 0; it.emb = r.emb || null; }
   }
   S.items = items; S.byId = new Map(items.map(it => [it.id, it]));
@@ -621,7 +623,7 @@ async function flush() {
   if (!dirty.size) return;
   const ids = [...dirty]; dirty.clear();
   const entries = ids.map(id => S.byId.get(id)).filter(Boolean).map(it => [it.id, {
-    size: it.size, mtime: it.mtime, w: it.w, h: it.h, manual: [...it.manual], rejected: [...it.rejected], fav: it.fav, emb: it.emb,
+    size: it.size, mtime: it.mtime, w: it.w, h: it.h, manual: [...it.manual], rejected: [...it.rejected], fav: it.fav, uses: it.uses, emb: it.emb,
   }]);
   try { await DB.putMany('items', entries); } catch (e) { console.error(e); toast('保存に失敗しました: ' + e.message, 5000); }
 }
@@ -633,6 +635,7 @@ const saveSettings = debounce(() => saveKV('settings', S.settings), 300);
 function matches(it, skipGroup) {
   const F = S.F;
   if (F.fav && !it.fav) return false;
+  if (F.used2 && it.uses < 2) return false;
   if (F.untagged && it.manual.size) return false;
   for (const [g, set] of F.inc) {
     if (g === skipGroup || !set.size) continue;
@@ -687,6 +690,7 @@ function computeView() {
   const s = S.settings.sort;
   if (s === 'new') v.sort((a, b) => b.mtime - a.mtime);
   else if (s === 'old') v.sort((a, b) => a.mtime - b.mtime);
+  else if (s === 'uses') v.sort((a, b) => b.uses - a.uses || b.mtime - a.mtime);
   else if (s === 'name') v.sort((a, b) => a.id.localeCompare(b.id, 'ja', { numeric: true }));
   else { const k = new Map(v.map(it => [it, hashStr(it.id + S.seed)])); v.sort((a, b) => k.get(a) - k.get(b)); }
   S.view = v;
@@ -744,6 +748,7 @@ function renderTiles(force) {
       t.style.transform = `translate(${p.x}px,${p.y}px)`; t.style.width = p.w + 'px'; t.style.height = p.h + 'px';
       t.classList.toggle('sel', S.sel.has(it.id));
       t.querySelector('.st').classList.toggle('on', it.fav);
+      t.querySelector('.uc').textContent = it.uses ? `×${it.uses}` : '';
       if (p.y + p.h >= top && p.y <= top + vh) vis.push(it);
     }
     for (const [id, t] of pool) if (!want.has(id)) { t.remove(); pool.delete(id); }
@@ -757,7 +762,7 @@ function makeTile(it) {
   const img = el('img', { alt: '', decoding: 'async' });
   img.onload = () => img.classList.add('ld');
   const st = el('button', { class: 'st', title: 'お気に入り', onclick: e => { e.stopPropagation(); toggleFav([it]); } }, '★');
-  const t = el('div', { class: 'tile', 'data-id': it.id }, img, el('div', { class: 'ov' }, el('div', { class: 'nm' }, it.name)), st);
+  const t = el('div', { class: 'tile', 'data-id': it.id }, img, el('div', { class: 'ov' }, el('div', { class: 'nm' }, it.name)), el('span', { class: 'uc', title: '作画で使った回数' }), st);
   t.addEventListener('click', e => onTileClick(e, it));
   const u = Thumbs.cached(it); if (u) img.src = u;
   return t;
@@ -937,18 +942,19 @@ $('#btnAI').onclick = () => {
 function renderSide() {
   const side = $('#side'); const keep = side.scrollTop; side.innerHTML = '';
   const F = S.F;
-  const active = F.fav || F.untagged || F.exc.size || [...F.inc.values()].some(s => s.size);
+  const active = F.fav || F.used2 || F.untagged || F.exc.size || [...F.inc.values()].some(s => s.size);
   side.append(el('div', { class: 'sec' },
     el('div', { class: 'row' },
       el('b', null, `${S.view.length.toLocaleString()} 枚`), el('span', { class: 'hint' }, `/ ${S.items.length.toLocaleString()}`),
-      active ? el('button', { style: 'margin-left:auto', onclick: () => { F.inc.clear(); F.exc.clear(); F.fav = F.untagged = false; refresh(); } }, '条件を全部外す') : null),
+      active ? el('button', { style: 'margin-left:auto', onclick: () => { F.inc.clear(); F.exc.clear(); F.fav = F.used2 = F.untagged = false; refresh(); } }, '条件を全部外す') : null),
     el('div', { class: 'hint' }, 'クリック：絞り込み（同じ見出しの中は「どれか」、見出し同士は「全部」）／ Alt+クリック：除外'),
   ));
   const base = S.items.filter(it => matches(it));
   side.append(el('div', { class: 'sec' }, el('div', { class: 'chips' },
     el('span', { class: 'chip' + (F.fav ? ' on' : ''), onclick: () => { F.fav = !F.fav; refresh(); } }, '★ お気に入り', el('span', { class: 'c' }, base.filter(i => i.fav).length)),
+    el('span', { class: 'chip' + (F.used2 ? ' on' : ''), title: '作画で2回以上使った画像', onclick: () => { F.used2 = !F.used2; refresh(); } }, '2回以上使った', el('span', { class: 'c' }, base.filter(i => i.uses >= 2).length)),
     el('span', { class: 'chip' + (F.untagged ? ' on' : ''), title: '自分でタグを付けていない画像', onclick: () => { F.untagged = !F.untagged; refresh(); } }, '手動タグなし'),
-  )));
+  ), el('button', { style: 'margin-top:8px', title: '今の★をまとめて外し、それぞれの「作画で使った回数」を1増やします', onclick: finishDrawing }, '作画おわり（★を外して回数+1）')));
   let hiddenGroups = 0;
   for (const g of GROUPS) {
     if (!g.tags.length && !g.custom) continue;
@@ -1047,6 +1053,15 @@ function removeTag(it, t) {
   if (it.ai.has(t)) it.rejected.add(t);
   computeTags(it); markDirty(it);
 }
+function finishDrawing() {
+  const list = S.items.filter(it => it.fav);
+  if (!list.length) { toast('★の付いた画像がありません'); return; }
+  if (!confirm(`★の付いた${list.length}枚の「作画で使った回数」を1増やして、★を外しますか？`)) return;
+  for (const it of list) { it.fav = false; it.uses++; markDirty(it); }
+  flush(); S.F.fav = false; refresh();
+  if (Lightbox.it) Lightbox.renderSide();
+  toast(`${list.length}枚を記録しました。次の作画の★を付けてください`);
+}
 function toggleFav(list) {
   const v = !list.every(it => it.fav);
   for (const it of list) { it.fav = v; markDirty(it); }
@@ -1105,6 +1120,7 @@ const Lightbox = {
       el('h2', null, it.name),
       el('div', { class: 'hint' }, it.id.split('/').slice(0, -1).join(' / ')),
       el('div', { class: 'hint' }, (it.w ? `${it.w} × ${it.h} px ・ ` : '') + kb(it) + ' ・ ' + new Date(it.mtime).toLocaleDateString('ja-JP')),
+      el('div', { class: 'hint' }, `作画で使った回数：${it.uses}回`),
       el('div', { class: 'row', style: 'margin:10px 0' },
         el('button', { class: it.fav ? 'primary' : '', onclick: () => toggleFav([it]) }, it.fav ? '★ お気に入り' : '☆ お気に入り'),
         el('button', { onclick: () => this.similarBoard(), disabled: !it.emb }, '似た画像をボードで')),
@@ -1236,6 +1252,7 @@ importFile.onchange = async () => {
       for (const t of r.manual || []) if (TAGS.has(t)) it.manual.add(t);
       for (const t of r.rejected || []) it.rejected.add(t);
       if (r.fav) it.fav = true;
+      if (r.uses > it.uses) it.uses = r.uses;
       markDirty(it); n++;
     }
     await rebuildAfterVocab(); closeModal(); toast(`${n}枚分のタグを読み込みました`);
@@ -1244,8 +1261,8 @@ importFile.onchange = async () => {
 };
 function exportData() {
   const items = {};
-  for (const it of S.items) if (it.manual.size || it.rejected.size || it.fav)
-    items[it.id.slice(S.root.length + 1)] = { manual: [...it.manual], rejected: [...it.rejected], fav: it.fav };
+  for (const it of S.items) if (it.manual.size || it.rejected.size || it.fav || it.uses)
+    items[it.id.slice(S.root.length + 1)] = { manual: [...it.manual], rejected: [...it.rejected], fav: it.fav, uses: it.uses };
   const blob = new Blob([JSON.stringify({ app: 'refboard', version: 1, root: S.root, exported: new Date().toISOString(), custom: S.custom, items }, null, 1)], { type: 'application/json' });
   const a = el('a', { href: URL.createObjectURL(blob), download: `refboard-tags-${S.root}-${new Date().toISOString().slice(0, 10)}.json` });
   document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
@@ -1293,7 +1310,7 @@ $('#dirInput').onchange = e => loadFromFiles(e.target.files);
   const st = await DB.get('kv', 'settings'); if (st) Object.assign(S.settings, st);
   S.custom = (await DB.get('kv', 'custom')) || [];
   setTheme(S.settings.theme);
-  $('#size').value = S.settings.tile; $('#sort').value = S.settings.sort;
+  $('#size').value = S.settings.tile; $('#sort').value = S.settings.sort; $('#qAI').checked = false;
   $('#app').classList.toggle('nosb', !S.settings.sidebar);
   if (navigator.storage?.persist) navigator.storage.persist().catch(() => {});
   let last = null; try { last = await DB.get('kv', 'lastDir'); } catch (e) {}
