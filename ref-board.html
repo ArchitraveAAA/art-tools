@@ -955,15 +955,14 @@ function renderSide() {
     el('span', { class: 'chip' + (F.used2 ? ' on' : ''), title: '作画で2回以上使った画像', onclick: () => { F.used2 = !F.used2; refresh(); } }, '2回以上使った', el('span', { class: 'c' }, base.filter(i => i.uses >= 2).length)),
     el('span', { class: 'chip' + (F.untagged ? ' on' : ''), title: '自分でタグを付けていない画像', onclick: () => { F.untagged = !F.untagged; refresh(); } }, '手動タグなし'),
   ), el('button', { style: 'margin-top:8px', title: '今の★をまとめて外し、それぞれの「作画で使った回数」を1増やします', onclick: finishDrawing }, '作画おわり（★を外して回数+1）')));
-  let hiddenGroups = 0;
   for (const g of GROUPS) {
+    // 絞り込み欄にはマイタグとフォルダだけ出す。AIの見出し（種類・被写体…）は画像を開いたときのタグ表示でだけ使う
+    if (!g.custom && g.id !== 'dir') continue;
     if (!g.tags.length && !g.custom) continue;
     const pool = S.items.filter(it => matches(it, g.id));
     const counts = new Map();
     for (const it of pool) for (const t of it.tags) if (TAGS.get(t).group === g.id) counts.set(t, (counts.get(t) || 0) + 1);
     const inc = F.inc.get(g.id) || new Set();
-    // AIのタグがまだ無い見出しは隠す（0件ばかり並ぶと探しにくいため）
-    if (!g.custom && g.id !== 'dir' && !counts.size && !inc.size && !g.tags.some(t => F.exc.has(t))) { hiddenGroups++; continue; }
     const collapsed = S.settings.collapsed[g.id];
     const chips = g.tags.map(t => {
       const n = counts.get(t) || 0, on = inc.has(t), ex = F.exc.has(t);
@@ -982,9 +981,6 @@ function renderSide() {
       el('div', { class: 'chips' }, chips.length ? chips : el('span', { class: 'hint' }, '画像を開いてタグを入力すると、ここに増えます')));
     side.append(sec);
   }
-  if (hiddenGroups) side.append(el('div', { class: 'hint sec' }, AI.state === 'ready'
-    ? `該当する画像が無い見出し（${hiddenGroups}個）は隠しています。`
-    : `「AIタグ付けを開始」すると、種類・ポーズ・光・色調などのタグ（${hiddenGroups}項目）が自動で付きます。`));
   const th = el('input', { type: 'range', min: 0, max: 100, value: S.settings.sens, oninput: e => { S.settings.sens = +e.target.value; saveSettings(); recomputeAllSoon(); } });
   side.append(el('div', { class: 'sec' }, el('h3', null, 'AIタグの付けやすさ'),
     el('div', { class: 'row' }, el('span', { class: 'hint' }, '少なめ'), th, el('span', { class: 'hint' }, '多め')),
