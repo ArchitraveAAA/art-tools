@@ -981,10 +981,6 @@ function renderSide() {
       el('div', { class: 'chips' }, chips.length ? chips : el('span', { class: 'hint' }, '画像を開いてタグを入力すると、ここに増えます')));
     side.append(sec);
   }
-  const th = el('input', { type: 'range', min: 0, max: 100, value: S.settings.sens, oninput: e => { S.settings.sens = +e.target.value; saveSettings(); recomputeAllSoon(); } });
-  side.append(el('div', { class: 'sec' }, el('h3', null, 'AIタグの付けやすさ'),
-    el('div', { class: 'row' }, el('span', { class: 'hint' }, '少なめ'), th, el('span', { class: 'hint' }, '多め')),
-    el('div', { class: 'hint' }, '点線のタグはAIが付けたもの。画像を開いて ✕ で外せます。タグを右クリックすると、そのタグが合いそうな画像を探せます。')));
   side.scrollTop = keep;
 }
 const recomputeAllSoon = debounce(() => { recomputeAll(); refresh(); }, 200);
