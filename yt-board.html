@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>YouTubeボード</title>
+<style>
+:root{
+  --bg:#1c1c1c;--panel:#242424;--panel2:#2d2d2d;--line:#3a3a3a;--text:#e4e4e4;--sub:#9a9a9a;
+  --accent:#4a8fd6;--accent-t:#fff;--ex:#c85a54;--tile:#2a2a2a;
+  color-scheme:dark;
+}
+:root[data-theme=light]{
+  --bg:#e6e6e6;--panel:#f2f2f2;--panel2:#fff;--line:#cfcfcf;--text:#1c1c1c;--sub:#666;
+  --tile:#d6d6d6;color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);
+  font:13px/1.5 "Yu Gothic UI","Meiryo","Hiragino Sans","Noto Sans JP",system-ui,sans-serif}
+button,input,select{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+button:hover{border-color:var(--sub)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-t)}
+button:disabled{opacity:.45;cursor:default}
+input[type=text],input[type=search],input[type=password],select{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 8px;min-width:0}
+input[type=range]{accent-color:var(--accent)}
+.hidden{display:none!important}
+
+header{position:sticky;top:0;z-index:10;display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header .grow{flex:1}
+#pl{max-width:280px}
+#q{width:220px}
+#count{color:var(--sub);font-size:12px;white-space:nowrap}
+.lbl{color:var(--sub);font-size:12px;display:flex;align-items:center;gap:4px;white-space:nowrap}
+#size{width:110px}
+
+#grid{display:grid;gap:var(--gap,6px);padding:12px;grid-template-columns:repeat(auto-fill,minmax(var(--w,240px),1fr))}
+.t{position:relative;display:block;aspect-ratio:16/9;background:var(--tile);border-radius:6px;overflow:hidden;color:#fff;text-decoration:none}
+.t img{width:100%;height:100%;object-fit:cover;display:block}
+.t .cap{position:absolute;left:0;right:0;bottom:0;padding:18px 8px 6px;background:linear-gradient(transparent,rgba(0,0,0,.85));font-size:12px;line-height:1.35;opacity:0;transition:opacity .12s}
+.t .cap b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-weight:600}
+.t .cap span{display:block;color:#ccc;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.t:hover .cap,.t:focus-visible .cap,body.caps .t .cap{opacity:1}
+.t .dur{position:absolute;right:5px;bottom:5px;background:rgba(0,0,0,.78);color:#fff;font-size:11px;padding:0 4px;border-radius:3px;transition:opacity .12s}
+.t:hover .dur,body.caps .t .dur{opacity:0}
+.t:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+#msg{margin:40px auto;max-width:560px;padding:0 16px;color:var(--sub);text-align:center}
+#msg p{margin:6px 0}
+
+#modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px}
+#modal .box{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:18px;width:min(520px,100%);max-height:calc(100vh - 32px);overflow:auto}
+#modal h3{margin:0 0 10px;font-size:15px}
+#modal label{display:block;margin:10px 0 2px;color:var(--sub);font-size:12px}
+#modal input{width:100%}
+#modal .btns{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+#modal details{margin-top:12px;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:6px 10px}
+#modal summary{cursor:pointer}
+#modal ol{margin:6px 0;padding-left:20px}
+#modal li{margin:3px 0}
+#modal code{font-size:12px;word-break:break-all}
+#modal .err{color:var(--ex);margin-top:8px;min-height:1em}
+#plList{margin:4px 0 0;padding:0;list-style:none}
+#plList li{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid var(--line)}
+#plList li span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#plList .sub{color:var(--sub);font-size:11px;flex:none}
+#toast{position:fixed;right:16px;bottom:16px;z-index:60;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:8px 12px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:420px}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <select id="pl" title="再生リスト"></select>
+  <button id="reload" title="YouTubeから読み直す">更新</button>
+  <input id="q" type="search" placeholder="タイトル・チャンネルで絞り込み">
+  <select id="ch" title="チャンネル"><option value="">すべてのチャンネル</option></select>
+  <select id="sort" title="並び順">
+    <option value="pos">リストの順</option>
+    <option value="added">追加が新しい順</option>
+    <option value="pub">公開が新しい順</option>
+    <option value="shuffle">シャッフル</option>
+  </select>
+  <button id="reshuffle" class="hidden" title="もう一度シャッフル">↻</button>
+  <span id="count"></span>
+  <span class="grow"></span>
+  <label class="lbl">大きさ <input id="size" type="range" min="140" max="560" step="10" value="240"></label>
+  <label class="lbl"><input id="caps" type="checkbox">タイトル常に表示</label>
+  <button id="theme" title="明るさ切り替え">◐</button>
+  <button id="settings">設定</button>
+</header>
+<div id="msg" class="hidden"></div>
+<div id="grid"></div>
+
+<div id="modal" class="hidden">
+  <div class="box">
+    <h3>設定</h3>
+    <label for="key">YouTube Data API キー</label>
+    <input id="key" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…">
+    <label for="url">再生リストのURLを追加</label>
+    <div style="display:flex;gap:6px"><input id="url" type="text" spellcheck="false" placeholder="https://youtube.com/playlist?list=…"><button id="add" class="primary">追加</button></div>
+    <ul id="plList"></ul>
+    <div class="err" id="err"></div>
+    <details>
+      <summary>APIキーの作り方（初回だけ・無料）</summary>
+      <ol>
+        <li><a href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noopener">Google Cloud コンソール</a>でプロジェクトを作る（名前は何でも可）</li>
+        <li><a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener">YouTube Data API v3</a> を開き「有効にする」</li>
+        <li><a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">認証情報</a> →「認証情報を作成」→「APIキー」</li>
+        <li>作ったキーの編集画面で制限をかける（他人に使われないため）<br>
+          ・アプリケーションの制限：ウェブサイト → <code>https://architraveaaa.github.io/*</code><br>
+          ・APIの制限：YouTube Data API v3 のみ</li>
+        <li>キーを上の欄に貼る</li>
+      </ol>
+      <div style="color:var(--sub);font-size:12px">キーはこのブラウザの中だけに保存され、YouTube（Google）以外には送られません。読めるのは公開・限定公開の再生リストです。</div>
+    </details>
+    <div class="btns"><button id="close" class="primary">閉じる</button></div>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script>
+'use strict';
+const $ = id => document.getElementById(id);
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem('ytb.'+k); return v == null ? d : JSON.parse(v); }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem('ytb.'+k, JSON.stringify(v)); }catch{} }
+};
+const API = 'https://www.googleapis.com/youtube/v3/';
+const DEFAULT_PL = 'PLWp-6d3Su5RPx6tdg4PIMoxsbXgKWZm3a';
+
+let key = LS.get('key', '');
+let lists = LS.get('lists', null) || [{id: DEFAULT_PL, title: ''}];
+let cur = LS.get('cur', lists[0] && lists[0].id);
+let items = [];
+let shuffleSeed = Math.random();
+
+function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function toast(t){ const el = $('toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('on'), 2600); }
+function parseListId(s){
+  s = s.trim();
+  try{ const u = new URL(s); const v = u.searchParams.get('list'); if(v) return v; }catch{}
+  return /^[A-Za-z0-9_-]{10,}$/.test(s) ? s : null;
+}
+function dur(iso){
+  const m = /P(?:(\d+)D)?T?(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(iso || '');
+  if(!m) return '';
+  const h = (+m[1]||0)*24 + (+m[2]||0), mi = +m[3]||0, s = +m[4]||0;
+  const p = n => String(n).padStart(2, '0');
+  return h ? `${h}:${p(mi)}:${p(s)}` : `${mi}:${p(s)}`;
+}
+
+async function api(path, params){
+  const u = new URL(API + path);
+  for(const [k, v] of Object.entries({...params, key})) u.searchParams.set(k, v);
+  const r = await fetch(u);
+  const j = await r.json().catch(() => ({}));
+  if(!r.ok){
+    const reason = j.error && j.error.errors && j.error.errors[0] && j.error.errors[0].reason;
+    const msg = {
+      playlistNotFound: '再生リストが見つかりません。非公開になっていないか確認してください。',
+      keyInvalid: 'APIキーが正しくありません。',
+      quotaExceeded: '今日の取得上限に達しました。明日また試してください。',
+      accessNotConfigured: 'このキーのプロジェクトで YouTube Data API v3 が有効になっていません。',
+      forbidden: 'キーの制限で拒否されました。サイトの制限（architraveaaa.github.io）を確認してください。'
+    }[reason] || (j.error && j.error.message) || ('エラー ' + r.status);
+    throw new Error(msg);
+  }
+  return j;
+}
+
+async function fetchList(id){
+  const meta = await api('playlists', {part: 'snippet', id});
+  if(!meta.items || !meta.items.length) throw new Error('再生リストが見つかりません。非公開になっていないか確認してください。');
+  const title = meta.items[0].snippet.title;
+  const out = [];
+  let token = '';
+  do{
+    const j = await api('playlistItems', {part: 'snippet,contentDetails', playlistId: id, maxResults: 50, ...(token ? {pageToken: token} : {})});
+    for(const it of j.items || []){
+      const s = it.snippet, vid = it.contentDetails && it.contentDetails.videoId;
+      if(!vid || !s.thumbnails || !Object.keys(s.thumbnails).length) continue; // 削除・非公開になった動画
+      const th = s.thumbnails;
+      out.push({
+        id: vid, pos: s.position, title: s.title,
+        ch: s.videoOwnerChannelTitle || '',
+        added: s.publishedAt || '', pub: it.contentDetails.videoPublishedAt || '',
+        m: (th.medium || th.default).url, h: (th.high || th.medium || th.default).url,
+        x: (th.maxres || th.standard || th.high || th.medium || th.default).url
+      });
+    }
+    token = j.nextPageToken || '';
+    showMsg(`読み込み中… ${out.length}件`);
+  }while(token);
+  for(let i = 0; i < out.length; i += 50){
+    const chunk = out.slice(i, i + 50);
+    try{
+      const j = await api('videos', {part: 'contentDetails', id: chunk.map(v => v.id).join(','), maxResults: 50});
+      const d = Object.fromEntries((j.items || []).map(v => [v.id, v.contentDetails.duration]));
+      for(const v of chunk) v.d = dur(d[v.id]);
+    }catch{} // 長さが取れなくても一覧は出す
+  }
+  return {title, items: out, at: Date.now()};
+}
+
+async function load(force){
+  if(!cur){ items = []; render(); showMsg('<p>設定から再生リストを追加してください。</p>'); return; }
+  const cache = LS.get('pl.' + cur, null);
+  if(cache && !force){ items = cache.items; render(); return; }
+  if(!key){ items = []; render(); showMsg('<p>はじめに「設定」でYouTube Data APIキーを入れてください。</p><p><button onclick="openSettings()">設定を開く</button></p>'); return; }
+  $('reload').disabled = true;
+  showMsg('読み込み中…');
+  try{
+    const r = await fetchList(cur);
+    LS.set('pl.' + cur, r);
+    const l = lists.find(l => l.id === cur); if(l){ l.title = r.title; LS.set('lists', lists); }
+    items = r.items; fillLists(); render();
+    if(force) toast(`${r.items.length}件を読み込みました`);
+  }catch(e){
+    if(cache){ items = cache.items; render(); toast(e.message); }
+    else{ items = []; render(); showMsg('<p>' + esc(e.message) + '</p>'); }
+  }finally{ $('reload').disabled = false; }
+}
+
+function showMsg(html){ const m = $('msg'); m.innerHTML = html; m.classList.toggle('hidden', !html); }
+
+function fillLists(){
+  const sel = $('pl');
+  sel.innerHTML = lists.map(l => `<option value="${esc(l.id)}">${esc(l.title || l.id)}</option>`).join('');
+  sel.value = cur || '';
+  $('plList').innerHTML = lists.map(l => {
+    const c = LS.get('pl.' + l.id, null);
+    return `<li><span title="${esc(l.id)}">${esc(l.title || l.id)}</span><span class="sub">${c ? c.items.length + '件' : '未取得'}</span><button data-del="${esc(l.id)}">外す</button></li>`;
+  }).join('');
+}
+
+function rand(seed){ let s = Math.floor(seed * 2**31) || 1; return () => (s = (s * 48271) % 2147483647) / 2147483647; }
+
+function view(){
+  const q = $('q').value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const ch = $('ch').value;
+  let v = items.filter(it => (!ch || it.ch === ch) && q.every(w => (it.title + ' ' + it.ch).toLowerCase().includes(w)));
+  const s = $('sort').value;
+  if(s === 'pos') v.sort((a, b) => a.pos - b.pos);
+  else if(s === 'added') v.sort((a, b) => b.added.localeCompare(a.added));
+  else if(s === 'pub') v.sort((a, b) => b.pub.localeCompare(a.pub));
+  else{ const r = rand(shuffleSeed); v = v.map(x => [r(), x]).sort((a, b) => a[0] - b[0]).map(x => x[1]); }
+  return v;
+}
+
+function render(){
+  const chs = {};
+  for(const it of items) if(it.ch) chs[it.ch] = (chs[it.ch] || 0) + 1;
+  const chSel = $('ch'), keep = chSel.value;
+  chSel.innerHTML = '<option value="">すべてのチャンネル</option>' + Object.entries(chs).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'ja'))
+    .map(([c, n]) => `<option value="${esc(c)}">${esc(c)}（${n}）</option>`).join('');
+  chSel.value = chs[keep] ? keep : '';
+  const v = view();
+  const w = +$('size').value;
+  const dpr = window.devicePixelRatio || 1;
+  const pick = it => w * dpr <= 320 ? it.m : w * dpr <= 480 ? it.h : it.x;
+  $('grid').innerHTML = v.map(it =>
+    `<a class="t" href="https://www.youtube.com/watch?v=${esc(it.id)}" target="_blank" rel="noopener" title="${esc(it.title)}">` +
+    `<img src="${esc(pick(it))}" alt="" loading="lazy" decoding="async">` +
+    (it.d ? `<span class="dur">${esc(it.d)}</span>` : '') +
+    `<span class="cap"><b>${esc(it.title)}</b><span>${esc(it.ch)}</span></span></a>`).join('');
+  $('count').textContent = items.length ? (v.length === items.length ? `${items.length}件` : `${v.length} / ${items.length}件`) : '';
+  if(items.length) showMsg(v.length ? '' : '<p>条件に合う動画がありません。</p>');
+}
+
+function applySize(){
+  const w = +$('size').value;
+  document.documentElement.style.setProperty('--w', w + 'px');
+  document.documentElement.style.setProperty('--gap', (w < 200 ? 4 : 6) + 'px');
+}
+
+window.openSettings = function(){ $('key').value = key; $('err').textContent = ''; fillLists(); $('modal').classList.remove('hidden'); };
+function closeSettings(){
+  const k = $('key').value.trim();
+  const changed = k !== key;
+  key = k; LS.set('key', key);
+  $('modal').classList.add('hidden');
+  if(changed || !items.length) load(false);
+}
+
+$('settings').onclick = openSettings;
+$('close').onclick = closeSettings;
+$('modal').addEventListener('click', e => { if(e.target === $('modal')) closeSettings(); });
+$('add').onclick = () => {
+  const id = parseListId($('url').value);
+  if(!id){ $('err').textContent = 'URLから再生リストIDを読み取れませんでした（URLに list= が含まれているか確認）。'; return; }
+  $('err').textContent = '';
+  if(!lists.some(l => l.id === id)) lists.push({id, title: ''});
+  LS.set('lists', lists);
+  cur = id; LS.set('cur', cur);
+  $('url').value = '';
+  fillLists();
+  key = $('key').value.trim(); LS.set('key', key);
+  load(false);
+};
+$('url').addEventListener('keydown', e => { if(e.key === 'Enter') $('add').click(); });
+$('plList').addEventListener('click', e => {
+  const id = e.target.dataset && e.target.dataset.del;
+  if(!id) return;
+  lists = lists.filter(l => l.id !== id); LS.set('lists', lists);
+  try{ localStorage.removeItem('ytb.pl.' + id); }catch{}
+  if(cur === id){ cur = lists[0] ? lists[0].id : null; LS.set('cur', cur); load(false); }
+  fillLists();
+});
+$('pl').onchange = () => { cur = $('pl').value; LS.set('cur', cur); $('q').value = ''; load(false); };
+$('reload').onclick = () => load(true);
+$('q').oninput = render;
+$('ch').onchange = render;
+$('sort').onchange = () => { $('reshuffle').classList.toggle('hidden', $('sort').value !== 'shuffle'); LS.set('sort', $('sort').value); render(); };
+$('reshuffle').onclick = () => { shuffleSeed = Math.random(); render(); };
+let sizeT;
+$('size').oninput = () => { applySize(); LS.set('size', +$('size').value); clearTimeout(sizeT); sizeT = setTimeout(render, 200); };
+$('caps').onchange = () => { document.body.classList.toggle('caps', $('caps').checked); LS.set('caps', $('caps').checked); };
+$('theme').onclick = () => {
+  const light = document.documentElement.dataset.theme !== 'light';
+  if(light) document.documentElement.dataset.theme = 'light'; else delete document.documentElement.dataset.theme;
+  LS.set('theme', light ? 'light' : 'dark');
+};
+document.addEventListener('keydown', e => {
+  if(e.key === 'Escape' && !$('modal').classList.contains('hidden')) closeSettings();
+  else if(e.key === '/' && document.activeElement.tagName !== 'INPUT'){ e.preventDefault(); $('q').focus(); }
+});
+
+// 起動
+if(LS.get('theme', 'dark') === 'light') document.documentElement.dataset.theme = 'light';
+$('size').value = LS.get('size', 240);
+$('sort').value = LS.get('sort', 'pos');
+$('reshuffle').classList.toggle('hidden', $('sort').value !== 'shuffle');
+$('caps').checked = LS.get('caps', false);
+document.body.classList.toggle('caps', $('caps').checked);
+applySize();
+fillLists();
+load(false);
+</script>
+</body>
+</html>
