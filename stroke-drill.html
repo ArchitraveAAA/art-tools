@@ -115,6 +115,7 @@ svg text{font-family:var(--f-body)}
     <label for="optAdaptive"><input id="optAdaptive" type="checkbox" checked>弱点強化</label>
     <label for="optAuto"><input id="optAuto" type="checkbox" checked>自動送り</label>
     <label for="optRays" id="raysLbl"><input id="optRays" type="checkbox" checked>補助線</label>
+    <label for="optCube" id="cubeLbl"><input id="optCube" type="checkbox" checked>立方体</label>
     <label for="optPen"><input id="optPen" type="checkbox">指タッチを無視</label>
     <button id="btnHistory" class="btn" type="button">記録</button>
   </div>
@@ -160,7 +161,7 @@ svg text{font-family:var(--f-body)}
 <script>
 (()=>{
 const KEY='stroke-drill.v1';
-const DEFAULTS={mode:'line',roundLen:20,roundLenBox:5,guide:true,adaptive:true,auto:true,penOnly:false,rays:true};
+const DEFAULTS={mode:'line',roundLen:20,roundLenBox:5,guide:true,adaptive:true,auto:true,penOnly:false,rays:true,cube:true};
 /* 32 directions, 11.25° apart. Bin angle is in screen space (0 = right, clockwise); labels use the usual convention (0° = right, 90° = up). */
 const LINE_DIRS=32,LINE_STEP=360/LINE_DIRS;
 const LINE_BINS=Array.from({length:LINE_DIRS},(_,i)=>String(i));
@@ -289,7 +290,7 @@ const BOX_EDGES=[[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,
 function genBox(bin){
   const [p,v]=bin.split('-'),m=margin(),mn=Math.min(W,H);
   for(let k=0;k<1500;k++){
-    const hs=[rand(.35,.65),rand(.35,.65),rand(.35,.65)];
+    const cs=rand(.4,.6),hs=set.cube?[cs,cs,cs]:[rand(.35,.65),rand(.35,.65),rand(.35,.65)];   // cube: equal edges, still exact under projection
     const yaw=p==='1p'?0:(Math.random()<.5?1:-1)*rand(22,68)*Math.PI/180;
     const bz=rand(2.8,5.5),bx=bz*Math.tan(rand(-.22,.22));   // farther = gentler perspective, less wide-angle distortion
     const by=v==='below'?-hs[1]-rand(.1,.7):v==='above'?hs[1]+rand(.1,.7):rand(-.6,.6)*hs[1];
@@ -331,7 +332,7 @@ function genBox(bin){
     }
     const expected=edges.filter(e=>!given.includes(e));
     if(expected.some(e=>dist(e.a,e.b)<14))continue;
-    return {type:'box',bin,p,v,h,vps,pts,edges,given,expected,size:sc*Math.max(bw,bh)};
+    return {type:'box',bin,p,v,h,vps,pts,edges,given,expected,size:sc*Math.max(bw,bh),cube:set.cube};
   }
   return null;
 }
@@ -350,7 +351,7 @@ function updatePrompt(){
   const P=S.problem;if(!P){$('prompt').textContent='';$('hint').textContent='画面が小さすぎます';return;}
   if(P.type==='line'){$('prompt').textContent=`直線 ${lineLabel(P.bin)}`;$('hint').textContent='● → ○';}
   else if(P.type==='circle'){const d=P.dir>0?'時計回り':'反時計回り';$('prompt').textContent=`正円 ${SIZE_LABEL[P.bin[0]]}・${d}`;$('hint').textContent=`● から${d}に一周`;}
-  else{$('prompt').textContent=`${BOX_LABEL[P.p]}の箱・${BOX_LABEL[P.v]}`;$('hint').textContent=`残りの辺を描く（隠れ線も）　${S.strokes.length} / ${P.expected.length}`;}
+  else{$('prompt').textContent=`${BOX_LABEL[P.p]}の${P.cube?'立方体':'箱'}・${BOX_LABEL[P.v]}`;$('hint').textContent=`残りの辺を描く（隠れ線も）　${S.strokes.length} / ${P.expected.length}`;}
 }
 
 /* ---------- drawing ---------- */
@@ -870,13 +871,13 @@ function syncMode(){
   const opts=isBox()?[3,5,10]:[10,20,40];
   $('roundLen').innerHTML=opts.map(v=>`<option value="${v}">${v}</option>`).join('');$('roundLen').value=String(roundLen());
   $('lenLbl').textContent=isBox()?'個数':'本数';
-  $('raysLbl').hidden=!isBox();
+  $('raysLbl').hidden=!isBox();$('cubeLbl').hidden=!isBox();
 }
 function setMode(m){set.mode=m;save();syncMode();restartRound();}
 Object.entries(MODE_BTN).forEach(([k,id])=>$(id).onclick=()=>setMode(k));
 $('roundLen').onchange=e=>{if(isBox())set.roundLenBox=Number(e.target.value);else set.roundLen=Number(e.target.value);save();restartRound();};
-[['optAdaptive','adaptive'],['optAuto','auto'],['optPen','penOnly'],['optRays','rays']].forEach(([id,k])=>{
-  const el=$(id);el.checked=!!set[k];el.onchange=()=>{set[k]=el.checked;save();if(k==='rays')redraw();};
+[['optAdaptive','adaptive'],['optAuto','auto'],['optPen','penOnly'],['optRays','rays'],['optCube','cube']].forEach(([id,k])=>{
+  const el=$(id);el.checked=!!set[k];el.onchange=()=>{set[k]=el.checked;save();if(k==='rays')redraw();if(k==='cube')restartRound();};
 });
 $('btnHistory').onclick=showHistory;
 $('btnRestart').onclick=restartRound;
