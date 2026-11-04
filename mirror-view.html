@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>反転ミラー</title>
+<style>
+:root{
+  --bg:#1c1c1c;--panel:#242424;--panel2:#2d2d2d;--line:#3a3a3a;--text:#e4e4e4;--sub:#9a9a9a;
+  --accent:#4a8fd6;--accent-t:#fff;--sel:#ffcc33;
+  color-scheme:dark;
+}
+:root[data-theme=light]{
+  --bg:#e6e6e6;--panel:#f2f2f2;--panel2:#fff;--line:#cfcfcf;--text:#1c1c1c;--sub:#666;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+  font:13px/1.5 "Yu Gothic UI","Meiryo","Hiragino Sans","Noto Sans JP",system-ui,sans-serif}
+body{display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:4px 10px;cursor:pointer;white-space:nowrap}
+button:hover{border-color:var(--sub)}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-t)}
+button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-t)}
+button:disabled{opacity:.45;cursor:default}
+kbd{font:11px ui-monospace,Consolas,monospace;border:1px solid var(--line);border-radius:3px;padding:0 3px;color:var(--sub)}
+.hidden{display:none!important}
+
+header{display:flex;gap:6px;align-items:center;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header .grow{flex:1}
+header .sep{width:1px;height:20px;background:var(--line);margin:0 2px}
+#status{color:var(--sub);font-size:12px}
+
+main{flex:1;position:relative;min-height:0;overflow:hidden}
+/* the mirror: frame = visible window (crop), flip = mirror transform, video = full capture placed inside */
+.frame{position:absolute;overflow:hidden}
+.flip{position:absolute;inset:0}
+.frame video{position:absolute;display:block;object-fit:fill;max-width:none}
+.frame.gray{filter:grayscale(1)}
+main.cropping .frame{cursor:crosshair;touch-action:none}
+#selbox{position:absolute;border:2px dashed var(--sel);background:rgba(255,204,51,.12);pointer-events:none}
+#croptip{position:absolute;left:50%;top:12px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 12px;display:flex;gap:8px;align-items:center;z-index:2}
+
+#empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px}
+#empty .card{max-width:520px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:20px 24px}
+#empty h1{font-size:18px;margin:0 0 8px}
+#empty ol{padding-left:20px;margin:8px 0 16px}
+#empty li{margin:4px 0}
+#empty .note{color:var(--sub);font-size:12px;margin-top:12px}
+
+body.bare header{display:none}
+</style>
+</head>
+<body>
+<header>
+  <button id="start" class="primary">画面を選ぶ</button>
+  <button id="stop" disabled>共有を止める</button>
+  <span class="sep"></span>
+  <button id="flipH" title="左右反転 (H)">左右反転</button>
+  <button id="flipV" title="上下反転 (V)">上下反転</button>
+  <button id="gray" title="モノクロ (G)">モノクロ</button>
+  <button id="pause" title="一時停止 (Space)" disabled>一時停止</button>
+  <span class="sep"></span>
+  <button id="crop" title="表示する範囲をドラッグで選ぶ (C)" disabled>範囲を選ぶ</button>
+  <button id="uncrop" title="範囲を解除" disabled>範囲解除</button>
+  <span class="sep"></span>
+  <button id="pip" title="常に手前に表示される小窓 (P)" disabled>小窓で出す</button>
+  <button id="bare" title="ボタンを隠す (Tab / Esc で戻す)">ボタンを隠す</button>
+  <span class="grow"></span>
+  <span id="status"></span>
+  <button id="theme" title="明るさ切り替え">◐</button>
+</header>
+<main id="main">
+  <div class="frame hidden" id="frame"><div class="flip"><video id="video" muted playsinline></video></div></div>
+  <div id="selbox" class="hidden"></div>
+  <div id="croptip" class="hidden">表示したい範囲（キャンバス部分など）をドラッグ <button id="cropCancel">やめる</button></div>
+  <div id="empty"><div class="card">
+    <h1>反転ミラー</h1>
+    <div>クリスタなどの作業画面を、左右反転してリアルタイムで映します。描いている画像そのものは変わりません。</div>
+    <ol>
+      <li>「画面を選ぶ」→「ウィンドウ」タブでクリスタを選んで「共有」</li>
+      <li>「範囲を選ぶ」でキャンバス部分だけをドラッグ（次回も覚えています）</li>
+      <li>「小窓で出す」で、常に手前に出る小さな窓になります。クリスタの横に置いて使えます</li>
+    </ol>
+    <button class="primary" id="startEmpty">画面を選ぶ</button>
+    <div class="note">ショートカット：<kbd>H</kbd> 左右反転　<kbd>V</kbd> 上下反転　<kbd>G</kbd> モノクロ　<kbd>Space</kbd> 一時停止　<kbd>C</kbd> 範囲を選ぶ　<kbd>P</kbd> 小窓　<kbd>Tab</kbd> ボタンを隠す<br>
+    「画面全体」を選ぶと、このページ自身が映り込んで合わせ鏡になります。ウィンドウ単位での共有がおすすめです。<br>
+    映像はこのPCの中だけで処理され、どこにも送信されません。Windows の Chrome / Edge 向けです。</div>
+  </div></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const LS = {
+  get(k, d){ try{ const v = localStorage.getItem('mirror-view:' + k); return v === null ? d : JSON.parse(v); }catch(e){ return d; } },
+  set(k, v){ try{ localStorage.setItem('mirror-view:' + k, JSON.stringify(v)); }catch(e){} }
+};
+const main = $('main'), frame = $('frame'), video = $('video');
+const FULL = {x:0, y:0, w:1, h:1};
+
+const st = {
+  stream: null,
+  flipH: LS.get('flipH', true),
+  flipV: LS.get('flipV', false),
+  gray: LS.get('gray', false),
+  paused: false,
+  crop: LS.get('crop', null),   // {x,y,w,h} in 0..1 of the captured frame
+  cropping: false,
+  drag: null,
+  pipWin: null,                 // Document Picture-in-Picture window
+  pipFrame: null, pipVideo: null
+};
+
+function setStatus(t){ $('status').textContent = t; }
+function syncButtons(){
+  const live = !!st.stream;
+  $('flipH').classList.toggle('on', st.flipH);
+  $('flipV').classList.toggle('on', st.flipV);
+  $('gray').classList.toggle('on', st.gray);
+  $('pause').classList.toggle('on', st.paused);
+  $('crop').classList.toggle('on', st.cropping);
+  $('pip').classList.toggle('on', !!st.pipWin);
+  for(const id of ['stop','pause','crop']) $(id).disabled = !live;
+  $('uncrop').disabled = !live || !st.crop;
+  const pipOK = 'documentPictureInPicture' in window;
+  $('pip').disabled = !live || !pipOK;
+  if(!pipOK) $('pip').title = 'このブラウザは小窓に対応していません（Chrome / Edge 116 以降で使えます）';
+  $('empty').classList.toggle('hidden', live);
+  frame.classList.toggle('hidden', !live);
+  $('croptip').classList.toggle('hidden', !st.cropping);
+  main.classList.toggle('cropping', st.cropping);
+}
+
+// ---- mirror layout (pure CSS: video keeps playing natively, no per-frame script) ----
+// view = {crop, flipH, flipV}; box = size of the area to fit into
+function layout(frameEl, videoEl, box, view){
+  const vw = videoEl.videoWidth, vh = videoEl.videoHeight;
+  if(!vw || !vh || !box.width || !box.height) return;
+  const c = view.crop;
+  const aw = c.w * vw, ah = c.h * vh;            // aspect of the shown region in pixels
+  const s = Math.min(box.width / aw, box.height / ah);
+  const w = aw * s, h = ah * s;
+  Object.assign(frameEl.style, {
+    width: w + 'px', height: h + 'px',
+    left: (box.width - w) / 2 + 'px', top: (box.height - h) / 2 + 'px'
+  });
+  frameEl.firstElementChild.style.transform = `scale(${view.flipH ? -1 : 1},${view.flipV ? -1 : 1})`;
+  Object.assign(videoEl.style, {
+    width: 100 / c.w + '%', height: 100 / c.h + '%',
+    left: -c.x / c.w * 100 + '%', top: -c.y / c.h * 100 + '%'
+  });
+  frameEl.classList.toggle('gray', st.gray);
+}
+function render(){
+  if(!st.stream) return;
+  // while choosing the crop the main view shows the whole frame un-flipped so the drag maps 1:1;
+  // the small window keeps showing the mirrored result
+  const mainView = st.cropping ? {crop: FULL, flipH: false, flipV: false}
+                               : {crop: st.crop || FULL, flipH: st.flipH, flipV: st.flipV};
+  layout(frame, video, {width: main.clientWidth, height: main.clientHeight}, mainView);
+  if(st.pipWin && st.pipVideo){
+    const d = st.pipWin.document.documentElement;
+    layout(st.pipFrame, st.pipVideo, {width: d.clientWidth, height: d.clientHeight},
+           {crop: st.crop || FULL, flipH: st.flipH, flipV: st.flipV});
+  }
+}
+new ResizeObserver(render).observe(main);
+video.addEventListener('resize', render);          // captured window was resized
+video.addEventListener('loadedmetadata', render);
+
+// ---- capture ----
+async function start(){
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia){
+    alert('このブラウザは画面共有に対応していません。Windows の Chrome か Edge で開いてください。');
+    return;
+  }
+  let stream;
+  try{
+    stream = await navigator.mediaDevices.getDisplayMedia({
+      video: { frameRate: { ideal: 30, max: 30 } },
+      audio: false,
+      selfBrowserSurface: 'exclude',
+      surfaceSwitching: 'include'
+    });
+  }catch(e){
+    if(e && e.name !== 'NotAllowedError') alert('画面共有を開始できませんでした：' + e.message);
+    return;
+  }
+  stopStream();
+  st.stream = stream;
+  st.paused = false;
+  const track = stream.getVideoTracks()[0];
+  track.addEventListener('ended', () => { if(st.stream === stream) stop(); });
+  setVideoSource(video, stream);
+  if(st.pipVideo) setVideoSource(st.pipVideo, stream);
+  setStatus('共有中');
+  syncButtons();
+  render();
+}
+function setVideoSource(el, stream){
+  el.srcObject = stream;
+  if(stream && !st.paused) el.play().catch(() => {});
+}
+function stopStream(){
+  if(st.stream){ st.stream.getTracks().forEach(t => t.stop()); st.stream = null; }
+  video.srcObject = null;
+  if(st.pipVideo) st.pipVideo.srcObject = null;
+}
+function stop(){
+  stopStream();
+  st.cropping = false; st.paused = false; st.drag = null;
+  $('selbox').classList.add('hidden');
+  closePip();
+  setStatus('');
+  syncButtons();
+}
+
+// ---- pause: pausing a live <video> holds its last frame; play() returns to live ----
+function setPaused(on){
+  if(!st.stream || st.cropping) return;
+  st.paused = on;
+  for(const el of [video, st.pipVideo]) if(el){ on ? el.pause() : el.play().catch(() => {}); }
+  syncButtons();
+}
+
+// ---- crop by drag (main view only; shows the full un-flipped frame) ----
+function toFrame(ev){
+  const r = frame.getBoundingClientRect();
+  const clamp = v => Math.min(1, Math.max(0, v));
+  return { x: clamp((ev.clientX - r.left) / r.width), y: clamp((ev.clientY - r.top) / r.height), r };
+}
+frame.addEventListener('pointerdown', ev => {
+  if(!st.cropping || ev.button !== 0) return;
+  frame.setPointerCapture(ev.pointerId);
+  const p = toFrame(ev);
+  st.drag = { a: p, b: p };
+  showSel();
+});
+frame.addEventListener('pointermove', ev => {
+  if(!st.drag) return;
+  st.drag.b = toFrame(ev);
+  showSel();
+});
+frame.addEventListener('pointerup', () => {
+  if(!st.drag) return;
+  const {a, b} = st.drag;
+  cancelDrag();
+  const x = Math.min(a.x, b.x), y = Math.min(a.y, b.y), w = Math.abs(a.x - b.x), h = Math.abs(a.y - b.y);
+  if(w < 0.02 || h < 0.02) return; // treat as a click; keep choosing
+  st.crop = {x, y, w, h};
+  LS.set('crop', st.crop);
+  st.cropping = false;
+  syncButtons(); render();
+});
+frame.addEventListener('pointercancel', cancelDrag);
+function cancelDrag(){ st.drag = null; $('selbox').classList.add('hidden'); }
+function showSel(){
+  const {a, b} = st.drag, r = b.r, m = main.getBoundingClientRect(), el = $('selbox');
+  el.style.left = (r.left - m.left + Math.min(a.x, b.x) * r.width) + 'px';
+  el.style.top = (r.top - m.top + Math.min(a.y, b.y) * r.height) + 'px';
+  el.style.width = Math.abs(a.x - b.x) * r.width + 'px';
+  el.style.height = Math.abs(a.y - b.y) * r.height + 'px';
+  el.classList.remove('hidden');
+}
+function toggleCrop(){
+  if(!st.stream) return;
+  if(!st.cropping && st.paused) setPaused(false);
+  st.cropping = !st.cropping;
+  cancelDrag();
+  syncButtons(); render();
+}
+
+// ---- small always-on-top window (Document Picture-in-Picture) ----
+async function togglePip(){
+  if(st.pipWin){ closePip(); return; }
+  if(!st.stream || !('documentPictureInPicture' in window)) return;
+  const c = st.crop || FULL, vw = video.videoWidth || 16, vh = video.videoHeight || 9;
+  const aspect = (c.w * vw) / (c.h * vh);
+  const w = 480, h = Math.round(Math.min(900, Math.max(160, w / aspect)));
+  let win;
+  try{
+    win = await documentPictureInPicture.requestWindow({ width: w, height: h });
+  }catch(e){
+    alert('小窓を開けませんでした：' + e.message);
+    return;
+  }
+  const d = win.document;
+  d.title = '反転ミラー';
+  const style = d.createElement('style');
+  style.textContent = `html,body{margin:0;height:100%;background:#111;overflow:hidden}
+    .frame{position:absolute;overflow:hidden}.flip{position:absolute;inset:0}
+    .frame video{position:absolute;display:block;object-fit:fill;max-width:none}
+    .frame.gray{filter:grayscale(1)}`;
+  d.head.append(style);
+  const f = d.createElement('div'); f.className = 'frame';
+  const fl = d.createElement('div'); fl.className = 'flip';
+  const v = d.createElement('video'); v.muted = true; v.playsInline = true;
+  fl.append(v); f.append(fl); d.body.append(f);
+  st.pipWin = win; st.pipFrame = f; st.pipVideo = v;
+  setVideoSource(v, st.stream);
+  if(st.paused) v.pause();
+  v.addEventListener('loadedmetadata', render);
+  v.addEventListener('resize', render);
+  win.addEventListener('resize', render);
+  win.addEventListener('keydown', onKey);
+  win.addEventListener('pagehide', () => {
+    if(st.pipWin !== win) return;
+    v.srcObject = null;
+    st.pipWin = st.pipFrame = st.pipVideo = null;
+    syncButtons();
+  });
+  syncButtons(); render();
+}
+function closePip(){
+  if(!st.pipWin) return;
+  const win = st.pipWin;
+  if(st.pipVideo) st.pipVideo.srcObject = null;
+  st.pipWin = st.pipFrame = st.pipVideo = null;
+  win.close();
+  syncButtons();
+}
+
+// ---- controls ----
+function toggle(key){
+  st[key] = !st[key];
+  LS.set(key, st[key]);
+  syncButtons(); render();
+}
+function setBare(on){ document.body.classList.toggle('bare', on); }
+$('start').onclick = start; $('startEmpty').onclick = start;
+$('stop').onclick = stop;
+$('flipH').onclick = () => toggle('flipH');
+$('flipV').onclick = () => toggle('flipV');
+$('gray').onclick = () => toggle('gray');
+$('pause').onclick = () => setPaused(!st.paused);
+$('crop').onclick = toggleCrop;
+$('cropCancel').onclick = toggleCrop;
+$('uncrop').onclick = () => { st.crop = null; LS.set('crop', null); syncButtons(); render(); };
+$('pip').onclick = togglePip;
+$('bare').onclick = () => setBare(true);
+main.addEventListener('dblclick', () => { if(!st.cropping) setBare(!document.body.classList.contains('bare')); });
+$('theme').onclick = () => {
+  const light = document.documentElement.dataset.theme !== 'light';
+  if(light) document.documentElement.dataset.theme = 'light'; else delete document.documentElement.dataset.theme;
+  LS.set('theme', light ? 'light' : 'dark');
+};
+if(LS.get('theme', 'dark') === 'light') document.documentElement.dataset.theme = 'light';
+
+function onKey(ev){
+  if(ev.ctrlKey || ev.altKey || ev.metaKey || ev.repeat) return;
+  const k = ev.key.toLowerCase();
+  if(k === 'tab'){ ev.preventDefault(); setBare(!document.body.classList.contains('bare')); return; }
+  if(k === 'escape'){ if(st.cropping) toggleCrop(); else setBare(false); return; }
+  const act = {
+    h: () => toggle('flipH'),
+    v: () => toggle('flipV'),
+    g: () => toggle('gray'),
+    ' ': () => setPaused(!st.paused),
+    c: toggleCrop,
+    p: togglePip
+  }[k];
+  if(act){ ev.preventDefault(); act(); }
+}
+document.addEventListener('keydown', onKey);
+
+syncButtons();
+</script>
+</body>
+</html>
